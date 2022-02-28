@@ -1,5 +1,4 @@
 module SoilBiogeochemDecompCascadeSOMicMod
-
   !-----------------------------------------------------------------------
   ! !DESCRIPTION:
   ! Sets the coeffiecients used in the decomposition submodel.
@@ -72,6 +71,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
 
   type, private :: params_type
      real(r8):: cn_mic        ! C:N for microbial biomass
+     real(r8):: cn_mac        ! C:N for mineral-associated organic matter
 
      real(r8):: cue_0         ! default carbon use efficiency for soil microbes
      real(r8):: mcue          ! temperature-dependence slope of micobial CUE
@@ -86,7 +86,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
      real(r8):: mclay         ! slope of texture dependence scalar as linear function of clay content
      real(r8):: clay0         ! clay content at which texture-dependence scalar equals 1.0
 
-     real(r8) :: cwd_fcel     !cellulose fraction for CWD
+     real(r8) :: cwd_fcel     ! cellulose fraction for CWD
 
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
@@ -108,109 +108,104 @@ contains
     ! !DESCRIPTION:
     !
     ! !USES:
-    use ncdio_pio    , only: file_desc_t,ncd_io
+    use ncdio_pio    , only: file_desc_t, ncd_io
     !
     ! !ARGUMENTS:
-    type(file_desc_t),intent(inout) :: ncid   ! pio netCDF file id
+    type(file_desc_t), intent(inout) :: ncid   ! pio netCDF file id
     !
     ! !LOCAL VARIABLES:
-    character(len=32)  :: subname = 'CNDecompBgcParamsType'
-    character(len=100) :: errCode = 'Error reading in CN const file '
+    character(len=32)  :: subname = 'CNDecompSOMicParamsType'
+    character(len=100) :: errCode = 'Error reading in SOMic const file '
     logical            :: readv   ! has variable been read in or not
     real(r8)           :: tempr   ! temporary to read in constant
     character(len=100) :: tString ! temp. var for reading
     !-----------------------------------------------------------------------
 
-    ! Read off of netcdf file
-    tString='bgc_tau_l1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    ! Read SOMic parameters from netcdf file
+    tString = 'somic_cwd_fcel'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%tau_l1_bgc=tempr
+    params_inst%somic_cwd_fcel = tempr
 
-    tString='bgc_tau_l2_l3'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_cn_mic'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%tau_l2_l3_bgc=tempr
+    params_inst%somic_cn_mic = tempr
 
-    tString='bgc_tau_s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_cn_mac'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%tau_s1_bgc=tempr
+    params_inst%somic_cn_mac = tempr
 
-    tString='bgc_tau_s2'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_cue_0'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%tau_s2_bgc=tempr
+    params_inst%somic_cue_0 = tempr
 
-    tString='bgc_tau_s3'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_mcue'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%tau_s3_bgc=tempr
+    params_inst%somic_mcue = tempr
 
-    tString='bgc_cn_s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_mic_vmax'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%cn_s1_bgc=tempr
+    params_inst%somic_mic_vmax = tempr
 
-    tString='bgc_cn_s2'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_mic_km'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%cn_s2_bgc=tempr
+    params_inst%somic_mic_km = tempr
 
-    tString='bgc_cn_s3'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_l1s1'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%cn_s3_bgc=tempr
+    params_inst%somic_k_l1s1 = tempr
 
-    tString='bgc_rf_l1s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_l2s1'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_l1s1_bgc=tempr
+    params_inst%somic_k_l2s1 = tempr
 
-    tString='bgc_rf_l2s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_s1s2'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_l2s1_bgc=tempr
+    params_inst%somic_k_s1s2 = tempr
 
-    tString='bgc_rf_l3s2'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_s1s3'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_l3s2_bgc=tempr
+    params_inst%somic_k_s1s3 = tempr
 
-    tString='bgc_rf_s2s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_s2s1'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_s2s1_bgc=tempr
+    params_inst%somic_k_s2s1 = tempr
 
-    tString='bgc_rf_s2s3'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_k_s3s1'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_s2s3_bgc=tempr
+    params_inst%somic_k_s3s1 = tempr
 
-    tString='bgc_rf_s3s1'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_mclay'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_s3s1_bgc=tempr
+    params_inst%somic_mclay = tempr
 
-    tString='bgc_rf_cwdl2'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    tString = 'somic_clay0'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_cwdl2_bgc=tempr
-
-    tString='bgc_cwd_fcel'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%cwd_fcel_bgc=tempr
+    params_inst%somic_clay0 = tempr
 
     allocate(params_inst%bgc_initial_Cstocks(ndecomp_pools_max))
-    tString='bgc_initial_Cstocks'
+    tString = 'somic_initial_Cstocks'
     call ncd_io(trim(tString), params_inst%bgc_initial_Cstocks(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
-    tString='bgc_initial_Cstocks_depth'
+    tString = 'somic_initial_Cstocks_depth'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%bgc_initial_Cstocks_depth=tempr
+    params_inst%bgc_initial_Cstocks_depth = tempr
 
   end subroutine readParams
 
