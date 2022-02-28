@@ -210,11 +210,11 @@ contains
   end subroutine readParams
 
   !-----------------------------------------------------------------------
-  subroutine init_decompcascade_bgc(bounds, soilbiogeochem_state_inst, soilstate_inst )
+  subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, soilstate_inst )
     !
     ! !DESCRIPTION:
-    !  initialize rate constants and decomposition pathways following the decomposition cascade of the BGC model.
-    !  written by C. Koven
+    !  initialize rate constants and decomposition pathways following the decomposition cascade of the SOMic model.
+    !  written by D. Woolf
     !
     ! !USES:
     !
