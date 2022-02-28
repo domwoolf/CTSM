@@ -1,5 +1,7 @@
 # CTSM
 
+### This fork contains a new soil bigeochemistry module based on the SOMic model (author, D. Woolf)
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3739617.svg)](https://doi.org/10.5281/zenodo.3739617)
 
 ## Overview and resources
