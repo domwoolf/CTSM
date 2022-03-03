@@ -54,19 +54,23 @@ module SoilBiogeochemDecompCascadeSOMicMod
   ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes)
   real(r8), private :: rf_l1s1
   real(r8), private :: rf_l2s1
+  real(r8), private :: rf_l3s1
   real(r8), private :: rf_s1s2
   real(r8), private :: rf_s1s3
   real(r8), private :: rf_s2s1
   real(r8), private :: rf_s3s1
   real(r8), private :: rf_cwdl2
+  real(r8), private :: rf_cwdl3
 
   ! indices of transitions
   integer, private :: i_l1s1
   integer, private :: i_l2s1
+  integer, private :: i_l3s1
   integer, private :: i_s1s2
   integer, private :: i_s1s3
   integer, private :: i_s2s1
   integer, private :: i_s3s1
+  integer, private :: i_cwdl2
   integer, private :: i_cwdl3
 
   type, private :: params_type
@@ -75,10 +79,11 @@ module SoilBiogeochemDecompCascadeSOMicMod
 
      real(r8):: cue_0         ! default carbon use efficiency for soil microbes
      real(r8):: mcue          ! temperature-dependence slope of micobial CUE
-     real(r8):: mic_vmax
-     real(r8):: mic_km
+     real(r8):: mic_vmax      ! Michaelis-Menten maximum rate coefficient
+     real(r8):: mic_km        ! Michaelis-Menten half saturation coefficient
      real(r8):: k_l1s1        ! rate constant for litter1 dissolution to DOC (/s)
      real(r8):: k_l2s1        ! rate constant for litter2 depolymerization to DOC (/s)
+     real(r8):: k_l3s1        ! rate constant for litter2 depolymerization to DOC (/s)
      real(r8):: k_s1s2        ! rate constant for microbial uptake of DOC
      real(r8):: k_s1s3        ! rate constant for sorption of DOC to minerals
      real(r8):: k_s2s1        ! rate constant for microbial turnover (both death and exudates)
@@ -125,77 +130,82 @@ contains
     tString = 'somic_cwd_fcel'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_cwd_fcel = tempr
+    params_inst%cwd_fcel = tempr
 
     tString = 'somic_cn_mic'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_cn_mic = tempr
+    params_inst%cn_mic = tempr
 
     tString = 'somic_cn_mac'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_cn_mac = tempr
+    params_inst%cn_mac = tempr
 
     tString = 'somic_cue_0'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_cue_0 = tempr
+    params_inst%cue_0 = tempr
 
     tString = 'somic_mcue'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_mcue = tempr
+    params_inst%mcue = tempr
 
     tString = 'somic_mic_vmax'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_mic_vmax = tempr
+    params_inst%mic_vmax = tempr
 
     tString = 'somic_mic_km'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_mic_km = tempr
+    params_inst%mic_km = tempr
 
     tString = 'somic_k_l1s1'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_l1s1 = tempr
+    params_inst%k_l1s1 = tempr
 
     tString = 'somic_k_l2s1'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_l2s1 = tempr
+    params_inst%k_l2s1 = tempr
+
+    tString = 'somic_k_l3s1'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%k_l3s1 = tempr
 
     tString = 'somic_k_s1s2'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_s1s2 = tempr
+    params_inst%k_s1s2 = tempr
 
     tString = 'somic_k_s1s3'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_s1s3 = tempr
+    params_inst%k_s1s3 = tempr
 
     tString = 'somic_k_s2s1'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_s2s1 = tempr
+    params_inst%k_s2s1 = tempr
 
     tString = 'somic_k_s3s1'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_k_s3s1 = tempr
+    params_inst%k_s3s1 = tempr
 
     tString = 'somic_mclay'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_mclay = tempr
+    params_inst%mclay = tempr
 
     tString = 'somic_clay0'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%somic_clay0 = tempr
+    params_inst%clay0 = tempr
 
     allocate(params_inst%bgc_initial_Cstocks(ndecomp_pools_max))
     tString = 'somic_initial_Cstocks'
@@ -208,6 +218,8 @@ contains
     params_inst%bgc_initial_Cstocks_depth = tempr
 
   end subroutine readParams
+
+
 
   !-----------------------------------------------------------------------
   subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, soilstate_inst )
@@ -228,18 +240,25 @@ contains
     real(r8) :: cn_s1
     real(r8) :: cn_s2
     real(r8) :: cn_s3
-    real(r8):: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
+    real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
+    real(r8) :: clayfact
+    real(r8) :: ksorb_altered
+    real(r8) :: kmicrobial_uptake_altered
+    real(r8) :: fsorb
+    real(r8) :: fmic
+    real(r8) :: kdoc
+
 
     integer  :: c, j    ! indices
     real(r8) :: t       ! temporary variable
     !-----------------------------------------------------------------------
 
     associate(                                                                                     &
-         cellsand                       => soilstate_inst%cellsand_col                           , & ! Input:  [real(r8)          (:,:)   ]  column 3D sand
+         clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:,:)   ]  column 3D clay
 
-         cascade_donor_pool             => decomp_cascade_con%cascade_donor_pool                 , & ! Output: [integer           (:)     ]  which pool is C taken from for a given decomposition step
-         cascade_receiver_pool          => decomp_cascade_con%cascade_receiver_pool              , & ! Output: [integer           (:)     ]  which pool is C added to for a given decomposition step
-         floating_cn_ratio_decomp_pools => decomp_cascade_con%floating_cn_ratio_decomp_pools     , & ! Output: [logical           (:)     ]  TRUE => pool has fixed C:N ratio
+         donor_pool                     => decomp_cascade_con%cascade_donor_pool                 , & ! Output: [integer           (:)     ]  which pool is C taken from for a given decomposition step
+         receiver_pool                  => decomp_cascade_con%cascade_receiver_pool              , & ! Output: [integer           (:)     ]  which pool is C added to for a given decomposition step
+         cn_ratio_is_fixed              => decomp_cascade_con%floating_cn_ratio_decomp_pools     , & ! Output: [logical           (:)     ]  TRUE => pool has fixed C:N ratio
          is_litter                      => decomp_cascade_con%is_litter                          , & ! Output: [logical           (:)     ]  TRUE => pool is a litter pool
          is_soil                        => decomp_cascade_con%is_soil                            , & ! Output: [logical           (:)     ]  TRUE => pool is a soil pool
          is_cwd                         => decomp_cascade_con%is_cwd                             , & ! Output: [logical           (:)     ]  TRUE => pool is a cwd pool
@@ -250,13 +269,13 @@ contains
          is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose
          is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin
          spinup_factor                  => decomp_cascade_con%spinup_factor                        & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool
-
          )
 
-      allocate(rf_s1s2(bounds%begc:bounds%endc,1:nlevdecomp))
-      allocate(rf_s1s3(bounds%begc:bounds%endc,1:nlevdecomp))
-      allocate(f_s1s2(bounds%begc:bounds%endc,1:nlevdecomp))
-      allocate(f_s1s3(bounds%begc:bounds%endc,1:nlevdecomp))
+      allocate(rf_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
+      allocate(rf_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
+      allocate( f_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
+      allocate( f_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
+
 
       !------- time-constant coefficients ---------- !
       ! set soil organic matter compartment C:N ratios
@@ -296,7 +315,7 @@ contains
       !-------------------  list of pools and their attributes  ------------
       i_litr_min = 1
       i_met_lit = i_litr_min
-      floating_cn_ratio_decomp_pools(i_met_lit) = .true.
+      cn_ratio_is_fixed(i_met_lit) = .true.
       decomp_cascade_con%decomp_pool_name_restart(i_met_lit) = 'litr1'
       decomp_cascade_con%decomp_pool_name_history(i_met_lit) = 'MET_LIT'
       decomp_cascade_con%decomp_pool_name_long(i_met_lit) = 'metabolic litter'
@@ -311,7 +330,7 @@ contains
       is_lignin(i_met_lit) = .false.
 
       i_cel_lit = i_met_lit + 1
-      floating_cn_ratio_decomp_pools(i_cel_lit) = .true.
+      cn_ratio_is_fixed(i_cel_lit) = .true.
       decomp_cascade_con%decomp_pool_name_restart(i_cel_lit) = 'litr2'
       decomp_cascade_con%decomp_pool_name_history(i_cel_lit) = 'CEL_LIT'
       decomp_cascade_con%decomp_pool_name_long(i_cel_lit) = 'cellulosic litter'
@@ -326,7 +345,7 @@ contains
       is_lignin(i_cel_lit) = .false.
 
       i_lig_lit = i_cel_lit + 1
-      floating_cn_ratio_decomp_pools(i_lig_lit) = .true.
+      cn_ratio_is_fixed(i_lig_lit) = .true.
       decomp_cascade_con%decomp_pool_name_restart(i_lig_lit) = 'litr3'
       decomp_cascade_con%decomp_pool_name_history(i_lig_lit) = 'LIG_LIT'
       decomp_cascade_con%decomp_pool_name_long(i_lig_lit) = 'lignin litter'
@@ -351,7 +370,7 @@ contains
       end if
 
       i_doc_som = i_lig_lit + 1
-      floating_cn_ratio_decomp_pools(i_doc_som) = .false.
+      cn_ratio_is_fixed(i_doc_som) = .false.
       decomp_cascade_con%decomp_pool_name_restart(i_doc_som) = 'soil1'
       decomp_cascade_con%decomp_pool_name_history(i_doc_som) = 'ACT_SOM'
       decomp_cascade_con%decomp_pool_name_long(i_doc_som) = 'active soil organic matter'
@@ -366,7 +385,7 @@ contains
       is_lignin(i_doc_som) = .false.
 
       i_mic_som = i_doc_som + 1
-      floating_cn_ratio_decomp_pools(i_mic_som) = .false.
+      cn_ratio_is_fixed(i_mic_som) = .false.
       decomp_cascade_con%decomp_pool_name_restart(i_mic_som) = 'soil2'
       decomp_cascade_con%decomp_pool_name_history(i_mic_som) = 'SLO_SOM'
       decomp_cascade_con%decomp_pool_name_long(i_mic_som) = 'slow soil organic matter'
@@ -381,7 +400,7 @@ contains
       is_lignin(i_mic_som) = .false.
 
       i_mac_som = i_mic_som + 1
-      floating_cn_ratio_decomp_pools(i_mac_som) = .false.
+      cn_ratio_is_fixed(i_mac_som) = .false.
       decomp_cascade_con%decomp_pool_name_restart(i_mac_som) = 'soil3'
       decomp_cascade_con%decomp_pool_name_history(i_mac_som) = 'PAS_SOM'
       decomp_cascade_con%decomp_pool_name_long(i_mac_som) = 'passive soil organic matter'
@@ -398,7 +417,7 @@ contains
       if (.not. use_fates) then
          ! CWD
          i_cwd = i_mac_som + 1
-         floating_cn_ratio_decomp_pools(i_cwd) = .true.
+         cn_ratio_is_fixed(i_cwd) = .true.
          decomp_cascade_con%decomp_pool_name_restart(i_cwd) = 'cwd'
          decomp_cascade_con%decomp_pool_name_history(i_cwd) = 'CWD'
          decomp_cascade_con%decomp_pool_name_long(i_cwd) = 'coarse woody debris'
@@ -438,54 +457,54 @@ contains
       !----------------  list of transitions and their time-independent coefficients  ---------------!
       i_l1s1 = 1
       decomp_cascade_con%cascade_step_name(i_l1s1) = 'L1S1'
-      cascade_donor_pool(i_l1s1) = i_met_lit
-      cascade_receiver_pool(i_l1s1) = i_doc_som
+      donor_pool(i_l1s1) = i_met_lit
+      receiver_pool(i_l1s1) = i_doc_som
 
       i_l2s1 = 2
       decomp_cascade_con%cascade_step_name(i_l2s1) = 'L2S1'
-      cascade_donor_pool(i_l2s1) = i_cel_lit
-      cascade_receiver_pool(i_l2s1) = i_doc_som
+      donor_pool(i_l2s1) = i_cel_lit
+      receiver_pool(i_l2s1) = i_doc_som
 
       i_l3s2 = 3
       decomp_cascade_con%cascade_step_name(i_l3s2) = 'L3S2'
-      cascade_donor_pool(i_l3s2) = i_lig_lit
-      cascade_receiver_pool(i_l3s2) = i_mic_som
+      donor_pool(i_l3s2) = i_lig_lit
+      receiver_pool(i_l3s2) = i_mic_som
 
       i_s1s2 = 4
       decomp_cascade_con%cascade_step_name(i_s1s2) = 'S1S2'
-      cascade_donor_pool(i_s1s2) = i_doc_som
-      cascade_receiver_pool(i_s1s2) = i_mic_som
+      donor_pool(i_s1s2) = i_doc_som
+      receiver_pool(i_s1s2) = i_mic_som
 
       i_s1s3 = 5
       decomp_cascade_con%cascade_step_name(i_s1s3) = 'S1S3'
-      cascade_donor_pool(i_s1s3) = i_doc_som
-      cascade_receiver_pool(i_s1s3) = i_mac_som
+      donor_pool(i_s1s3) = i_doc_som
+      receiver_pool(i_s1s3) = i_mac_som
 
       i_s2s1 = 6
       decomp_cascade_con%cascade_step_name(i_s2s1) = 'S2S1'
-      cascade_donor_pool(i_s2s1) = i_mic_som
-      cascade_receiver_pool(i_s2s1) = i_doc_som
+      donor_pool(i_s2s1) = i_mic_som
+      receiver_pool(i_s2s1) = i_doc_som
 
       i_s2s3 = 7
       decomp_cascade_con%cascade_step_name(i_s2s3) = 'S2S3'
-      cascade_donor_pool(i_s2s3) = i_mic_som
-      cascade_receiver_pool(i_s2s3) = i_mac_som
+      donor_pool(i_s2s3) = i_mic_som
+      receiver_pool(i_s2s3) = i_mac_som
 
       i_s3s1 = 8
       decomp_cascade_con%cascade_step_name(i_s3s1) = 'S3S1'
-      cascade_donor_pool(i_s3s1) = i_mac_som
-      cascade_receiver_pool(i_s3s1) = i_doc_som
+      donor_pool(i_s3s1) = i_mac_som
+      receiver_pool(i_s3s1) = i_doc_som
 
       if (.not. use_fates) then
          i_cwdl2 = 9
          decomp_cascade_con%cascade_step_name(i_cwdl2) = 'CWDL2'
-         cascade_donor_pool(i_cwdl2) = i_cwd
-         cascade_receiver_pool(i_cwdl2) = i_cel_lit
+         donor_pool(i_cwdl2) = i_cwd
+         receiver_pool(i_cwdl2) = i_cel_lit
 
          i_cwdl3 = 10
          decomp_cascade_con%cascade_step_name(i_cwdl3) = 'CWDL3'
-         cascade_donor_pool(i_cwdl3) = i_cwd
-         cascade_receiver_pool(i_cwdl3) = i_lig_lit
+         donor_pool(i_cwdl3) = i_cwd
+         receiver_pool(i_cwdl3) = i_lig_lit
       end if
 
       deallocate(params_inst%bgc_initial_Cstocks)
@@ -493,6 +512,13 @@ contains
     end associate
 
   end subroutine init_decompcascade_bgc
+
+
+
+
+
+
+
 
   !-----------------------------------------------------------------------
   subroutine decomp_rate_constants_bgc(bounds, num_soilc, filter_soilc, &
