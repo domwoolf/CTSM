@@ -40,8 +40,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
   logical , public :: use_century_tfunc = .false.
   real(r8), public :: normalization_tref = 15._r8            ! reference temperature for normalizaion (degrees C)
   !
-  ! !PRIVATE DATA MEMBERS
 
+  ! !PRIVATE DATA MEMBERS
   ! soil pool indices
   integer, private :: i_mac_som  ! index of mineral-associated Soil Organic Matter (SOM)
   integer, private :: i_mic_som  ! index of active microbial biomass SOM
@@ -49,9 +49,10 @@ module SoilBiogeochemDecompCascadeSOMicMod
   integer, private :: i_cel_lit  ! index of cellulose litter pool
   integer, private :: i_lig_lit  ! index of lignin litter pool
 
+  ! cwd variables
   real(r8), private :: cwd_fcel  ! cellulose fraction in coarse woody debris
 
-  ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes)
+  ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes), and cwd decomposition.  The zero rf's are placeholders, that may be removed later.
   real(r8), private :: rf_l1s1
   real(r8), private :: rf_l2s1
   real(r8), private :: rf_l3s1
@@ -73,35 +74,31 @@ module SoilBiogeochemDecompCascadeSOMicMod
   integer, private :: i_cwdl2
   integer, private :: i_cwdl3
 
+  ! define type to pass input parameters for SOMIc model (then define variable "params_inst" of this type)
   type, private :: params_type
-     real(r8):: cn_mic        ! C:N for microbial biomass
-     real(r8):: cn_mac        ! C:N for mineral-associated organic matter
-
-     real(r8):: cue_0         ! default carbon use efficiency for soil microbes
-     real(r8):: mcue          ! temperature-dependence slope of micobial CUE
-     real(r8):: mic_vmax      ! Michaelis-Menten maximum rate coefficient
-     real(r8):: mic_km        ! Michaelis-Menten half saturation coefficient
-     real(r8):: k_l1s1        ! rate constant for litter1 dissolution to DOC (/s)
-     real(r8):: k_l2s1        ! rate constant for litter2 depolymerization to DOC (/s)
-     real(r8):: k_l3s1        ! rate constant for litter2 depolymerization to DOC (/s)
-     real(r8):: k_s1s2        ! rate constant for microbial uptake of DOC
-     real(r8):: k_s1s3        ! rate constant for sorption of DOC to minerals
-     real(r8):: k_s2s1        ! rate constant for microbial turnover (both death and exudates)
-     real(r8):: k_s3s1        ! rate constant for desorption of MAC to DOC
-     real(r8):: mclay         ! slope of texture dependence scalar as linear function of clay content
-     real(r8):: clay0         ! clay content at which texture-dependence scalar equals 1.0
-
-     real(r8) :: cwd_fcel     ! cellulose fraction for CWD
-
+     real(r8) :: cn_dom        ! C:N for dissolved organic matter
+     real(r8) :: cn_mic        ! C:N for microbial biomass
+     real(r8) :: cn_mac        ! C:N for mineral-associated organic matter
+     real(r8) :: cue_0         ! default carbon use efficiency for soil microbes
+     real(r8) :: mcue          ! temperature-dependence slope of micobial CUE
+     real(r8) :: mic_vmax      ! Michaelis-Menten maximum rate coefficient
+     real(r8) :: mic_km        ! Michaelis-Menten half saturation coefficient
+     real(r8) :: k_l1s1        ! rate constant for litter1 dissolution to DOC (/s)
+     real(r8) :: k_l2s1        ! rate constant for litter2 depolymerization to DOC (/s)
+     real(r8) :: k_l3s1        ! rate constant for litter2 depolymerization to DOC (/s)
+     real(r8) :: k_s1s2        ! rate constant for microbial uptake of DOC
+     real(r8) :: k_s1s3        ! rate constant for sorption of DOC to minerals
+     real(r8) :: k_s2s1        ! rate constant for microbial turnover (both death and exudates)
+     real(r8) :: k_s3s1        ! rate constant for desorption of MAC to DOC
+     real(r8) :: mclay         ! slope of texture dependence scalar as linear function of clay content
+     real(r8) :: clay0         ! clay content at which texture-dependence scalar equals 1.0
+     real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
-
   end type params_type
-  !
   type(params_type), private :: params_inst
 
-  character(len=*), parameter, private :: sourcefile = &
-       __FILE__
+  character(len=*), parameter, private :: sourcefile = __FILE__
 
   !-----------------------------------------------------------------------
 
@@ -113,13 +110,13 @@ contains
     ! !DESCRIPTION:
     !
     ! !USES:
-    use ncdio_pio    , only: file_desc_t, ncd_io
+    use ncdio_pio , only: file_desc_t, ncd_io
     !
     ! !ARGUMENTS:
     type(file_desc_t), intent(inout) :: ncid   ! pio netCDF file id
     !
     ! !LOCAL VARIABLES:
-    character(len=32)  :: subname = 'CNDecompSOMicParamsType'
+    ! character(len=32)  :: subname = 'CNDecompSOMicParamsType'     ! commented out as does not appear to be used.  consider deleting line.
     character(len=100) :: errCode = 'Error reading in SOMic const file '
     logical            :: readv   ! has variable been read in or not
     real(r8)           :: tempr   ! temporary to read in constant
@@ -131,6 +128,16 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_fcel = tempr
+
+    tString='bgc_rf_cwdl3'
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%rf_cwdl3_bgc=tempr
+
+    tString = 'somic_cn_dom'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%cn_dom = tempr
 
     tString = 'somic_cn_mic'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -236,10 +243,11 @@ contains
     type(soilstate_type)            , intent(in)    :: soilstate_inst
     !
     ! !LOCAL VARIABLES
-    !-- properties of each decomposing pool
-    real(r8) :: cn_s1
-    real(r8) :: cn_s2
-    real(r8) :: cn_s3
+    integer  :: c, j                         ! indices
+    real(r8) :: t                            ! temporary variable
+    real(r8) :: cn_dom
+    real(r8) :: cn_mic
+    real(r8) :: cn_mac
     real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
     real(r8) :: clayfact
     real(r8) :: ksorb_altered
@@ -247,15 +255,13 @@ contains
     real(r8) :: fsorb
     real(r8) :: fmic
     real(r8) :: kdoc
-
-
-    integer  :: c, j    ! indices
-    real(r8) :: t       ! temporary variable
+    real(r8) :: cue
     !-----------------------------------------------------------------------
 
     associate(                                                                                     &
+         ! Inputs
          clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:,:)   ]  column 3D clay
-
+         ! Outputs
          donor_pool                     => decomp_cascade_con%cascade_donor_pool                 , & ! Output: [integer           (:)     ]  which pool is C taken from for a given decomposition step
          receiver_pool                  => decomp_cascade_con%cascade_receiver_pool              , & ! Output: [integer           (:)     ]  which pool is C added to for a given decomposition step
          cn_ratio_is_fixed              => decomp_cascade_con%floating_cn_ratio_decomp_pools     , & ! Output: [logical           (:)     ]  TRUE => pool has fixed C:N ratio
@@ -272,7 +278,6 @@ contains
          )
 
       allocate(rf_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
-      allocate(rf_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
       allocate( f_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
       allocate( f_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
 
@@ -283,15 +288,14 @@ contains
       cn_s2 = params_inst%cn_s2_bgc
       cn_s3 = params_inst%cn_s3_bgc
 
-      ! set respiration fractions for fluxes between compartments
-      rf_l1s1 = params_inst%rf_l1s1_bgc
-      rf_l2s1 = params_inst%rf_l2s1_bgc
-      rf_l3s2 = params_inst%rf_l3s2_bgc
-      rf_s2s1 = params_inst%rf_s2s1_bgc
-      rf_s2s3 = params_inst%rf_s2s3_bgc
-      rf_s3s1 = params_inst%rf_s3s1_bgc
-
-      rf_cwdl2 = params_inst%rf_cwdl2_bgc
+      ! set respiration fractions for fluxes between compartments.  In Somic model, CO2 is only evolved from microbial biomass thorugh respiration. rf for other transitions is zero.
+      rf_l1s1 = 0.0
+      rf_l2s1 = 0.0
+      rf_l3s1 = 0.0
+      rf_s1s2 = 1 - params_inst%cue_0  ! intialise CUE to the default value at 15 C.  Time dependent loop will vary CUE with soil temperature as function of layer.
+      rf_s2s1 = 0.0
+      rf_s3s1 = 0.0
+      rf_cwdl3 = params_inst%rf_cwdl3_bgc
 
       ! set the cellulose and lignin fractions for coarse woody debris
       cwd_fcel = params_inst%cwd_fcel_bgc
