@@ -40,8 +40,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
   logical , public :: use_century_tfunc = .false.
   real(r8), public :: normalization_tref = 15._r8            ! reference temperature for normalizaion (degrees C)
   !
-  ! !PRIVATE DATA MEMBERS
 
+  ! !PRIVATE DATA MEMBERS
   ! soil pool indices
   integer, private :: i_mac_som  ! index of mineral-associated Soil Organic Matter (SOM)
   integer, private :: i_mic_som  ! index of active microbial biomass SOM
@@ -49,9 +49,10 @@ module SoilBiogeochemDecompCascadeSOMicMod
   integer, private :: i_cel_lit  ! index of cellulose litter pool
   integer, private :: i_lig_lit  ! index of lignin litter pool
 
+  ! cwd variables
   real(r8), private :: cwd_fcel  ! cellulose fraction in coarse woody debris
 
-  ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes)
+  ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes), and cwd decomposition.  The zero rf's are placeholders, that may be removed later.
   real(r8), private :: rf_l1s1
   real(r8), private :: rf_l2s1
   real(r8), private :: rf_l3s1
@@ -73,35 +74,31 @@ module SoilBiogeochemDecompCascadeSOMicMod
   integer, private :: i_cwdl2
   integer, private :: i_cwdl3
 
+  ! define type to pass input parameters for SOMIc model (then define variable "params_inst" of this type)
   type, private :: params_type
-     real(r8):: cn_mic        ! C:N for microbial biomass
-     real(r8):: cn_mac        ! C:N for mineral-associated organic matter
-
-     real(r8):: cue_0         ! default carbon use efficiency for soil microbes
-     real(r8):: mcue          ! temperature-dependence slope of micobial CUE
-     real(r8):: mic_vmax      ! Michaelis-Menten maximum rate coefficient
-     real(r8):: mic_km        ! Michaelis-Menten half saturation coefficient
-     real(r8):: k_l1s1        ! rate constant for litter1 dissolution to DOC (/s)
-     real(r8):: k_l2s1        ! rate constant for litter2 depolymerization to DOC (/s)
-     real(r8):: k_l3s1        ! rate constant for litter2 depolymerization to DOC (/s)
-     real(r8):: k_s1s2        ! rate constant for microbial uptake of DOC
-     real(r8):: k_s1s3        ! rate constant for sorption of DOC to minerals
-     real(r8):: k_s2s1        ! rate constant for microbial turnover (both death and exudates)
-     real(r8):: k_s3s1        ! rate constant for desorption of MAC to DOC
-     real(r8):: mclay         ! slope of texture dependence scalar as linear function of clay content
-     real(r8):: clay0         ! clay content at which texture-dependence scalar equals 1.0
-
-     real(r8) :: cwd_fcel     ! cellulose fraction for CWD
-
+     real(r8) :: cn_dom        ! C:N for dissolved organic matter
+     real(r8) :: cn_mic        ! C:N for microbial biomass
+     real(r8) :: cn_mac        ! C:N for mineral-associated organic matter
+     real(r8) :: cue_0         ! default carbon use efficiency for soil microbes
+     real(r8) :: mcue          ! temperature-dependence slope of micobial CUE
+     real(r8) :: mic_vmax      ! Michaelis-Menten maximum rate coefficient
+     real(r8) :: mic_km        ! Michaelis-Menten half saturation coefficient
+     real(r8) :: k_l1s1        ! rate constant for litter1 dissolution to DOC (/s)
+     real(r8) :: k_l2s1        ! rate constant for litter2 depolymerization to DOC (/s)
+     real(r8) :: k_l3s1        ! rate constant for litter2 depolymerization to DOC (/s)
+     real(r8) :: k_s1s2        ! rate constant for microbial uptake of DOC
+     real(r8) :: k_s1s3        ! rate constant for sorption of DOC to minerals
+     real(r8) :: k_s2s1        ! rate constant for microbial turnover (both death and exudates)
+     real(r8) :: k_s3s1        ! rate constant for desorption of MAC to DOC
+     real(r8) :: mclay         ! slope of texture dependence scalar as linear function of clay content
+     real(r8) :: clay0         ! clay content at which texture-dependence scalar equals 1.0
+     real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
-
   end type params_type
-  !
   type(params_type), private :: params_inst
 
-  character(len=*), parameter, private :: sourcefile = &
-       __FILE__
+  character(len=*), parameter, private :: sourcefile = __FILE__
 
   !-----------------------------------------------------------------------
 
@@ -113,13 +110,13 @@ contains
     ! !DESCRIPTION:
     !
     ! !USES:
-    use ncdio_pio    , only: file_desc_t, ncd_io
+    use ncdio_pio , only: file_desc_t, ncd_io
     !
     ! !ARGUMENTS:
     type(file_desc_t), intent(inout) :: ncid   ! pio netCDF file id
     !
     ! !LOCAL VARIABLES:
-    character(len=32)  :: subname = 'CNDecompSOMicParamsType'
+    ! character(len=32)  :: subname = 'CNDecompSOMicParamsType'     ! commented out as does not appear to be used.  consider deleting line.
     character(len=100) :: errCode = 'Error reading in SOMic const file '
     logical            :: readv   ! has variable been read in or not
     real(r8)           :: tempr   ! temporary to read in constant
@@ -131,6 +128,16 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_fcel = tempr
+
+    tString='bgc_rf_cwdl3'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%rf_cwdl3_bgc=tempr
+
+    tString = 'somic_cn_dom'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%cn_dom = tempr
 
     tString = 'somic_cn_mic'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -213,7 +220,7 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     tString = 'somic_initial_Cstocks_depth'
-    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
@@ -236,10 +243,11 @@ contains
     type(soilstate_type)            , intent(in)    :: soilstate_inst
     !
     ! !LOCAL VARIABLES
-    !-- properties of each decomposing pool
-    real(r8) :: cn_s1
-    real(r8) :: cn_s2
-    real(r8) :: cn_s3
+    integer  :: c, j                         ! indices
+    real(r8) :: t                            ! temporary variable
+    real(r8) :: cn_dom
+    real(r8) :: cn_mic
+    real(r8) :: cn_mac
     real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
     real(r8) :: clayfact
     real(r8) :: ksorb_altered
@@ -247,15 +255,13 @@ contains
     real(r8) :: fsorb
     real(r8) :: fmic
     real(r8) :: kdoc
-
-
-    integer  :: c, j    ! indices
-    real(r8) :: t       ! temporary variable
+    real(r8) :: cue
     !-----------------------------------------------------------------------
 
     associate(                                                                                     &
-         clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:,:)   ]  column 3D clay
-
+         ! Inputs
+         clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:, :)   ]  column 3D clay
+         ! Outputs
          donor_pool                     => decomp_cascade_con%cascade_donor_pool                 , & ! Output: [integer           (:)     ]  which pool is C taken from for a given decomposition step
          receiver_pool                  => decomp_cascade_con%cascade_receiver_pool              , & ! Output: [integer           (:)     ]  which pool is C added to for a given decomposition step
          cn_ratio_is_fixed              => decomp_cascade_con%floating_cn_ratio_decomp_pools     , & ! Output: [logical           (:)     ]  TRUE => pool has fixed C:N ratio
@@ -268,48 +274,50 @@ contains
          is_metabolic                   => decomp_cascade_con%is_metabolic                       , & ! Output: [logical           (:)     ]  TRUE => pool is metabolic material
          is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose
          is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin
-         spinup_factor                  => decomp_cascade_con%spinup_factor                        & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         spinup_factor                  => decomp_cascade_con%spinup_factor                      , & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         begc                           => bounds%begc                                           , &
+         endc                           => bounds%endc                                             &
          )
 
-      allocate(rf_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
-      allocate(rf_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
-      allocate( f_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp))
-      allocate( f_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp))
-
+      allocate(rf_s1s2(begc:endc, 1:nlevdecomp))
+      allocate( f_s1s2(begc:endc, 1:nlevdecomp))
+      allocate( f_s1s3(begc:endc, 1:nlevdecomp))
 
       !------- time-constant coefficients ---------- !
       ! set soil organic matter compartment C:N ratios
-      cn_s1 = params_inst%cn_s1_bgc
-      cn_s2 = params_inst%cn_s2_bgc
-      cn_s3 = params_inst%cn_s3_bgc
+      cn_s1 = params_inst%cn_dom
+      cn_s2 = params_inst%cn_mic
+      cn_s3 = params_inst%cn_mac
 
-      ! set respiration fractions for fluxes between compartments
-      rf_l1s1 = params_inst%rf_l1s1_bgc
-      rf_l2s1 = params_inst%rf_l2s1_bgc
-      rf_l3s2 = params_inst%rf_l3s2_bgc
-      rf_s2s1 = params_inst%rf_s2s1_bgc
-      rf_s2s3 = params_inst%rf_s2s3_bgc
-      rf_s3s1 = params_inst%rf_s3s1_bgc
-
-      rf_cwdl2 = params_inst%rf_cwdl2_bgc
+      ! set respiration fractions for fluxes between compartments.  In Somic model, CO2 is only evolved from microbial biomass thorugh respiration. rf for other transitions is zero.
+      rf_l1s1 = 0.0_r8
+      rf_l2s1 = 0.0_r8
+      rf_l3s1 = 0.0_r8
+      rf_s2s1 = 0.0_r8
+      rf_s3s1 = 0.0_r8
+      rf_cwdl3 = params_inst%rf_cwdl3_bgc
 
       ! set the cellulose and lignin fractions for coarse woody debris
       cwd_fcel = params_inst%cwd_fcel_bgc
 
       ! set path fractions
-      f_s2s1 = 0.42_r8/(0.45_r8)
-      f_s2s3 = 0.03_r8/(0.45_r8)
+      f_s2s1 = 1.0_r8
+      f_s3s1 = 1.0_r8
 
-      ! some of these are dependent on the soil texture properties
-      do c = bounds%begc, bounds%endc
-         do j = 1, nlevdecomp
-            t = 0.85_r8 - 0.68_r8 * 0.01_r8 * (100._r8 - cellsand(c,j))
-            f_s1s2(c,j) = 1._r8 - .004_r8 / (1._r8 - t)
-            f_s1s3(c,j) = .004_r8 / (1._r8 - t)
-            rf_s1s2(c,j) = t
-            rf_s1s3(c,j) = t
-         end do
-      end do
+      ! Note that some of the rf and f coefficents vary with time, hence not set here.  These include:
+      !   rf_s1s2, f_s1s2, f_s1s3
+
+      ! some of these rf and f coefficients are dependent on the soil texture and/or microbial biomass.  define these as for each layer
+      !do c = begc, endc
+      !   do j = 1, nlevdecomp
+      !      !t = 0.85_r8 - 0.68_r8 * 0.01_r8 * (100._r8 - cellsand(c, j))
+      !      !f_s1s2(c, j) = 1._r8 - .004_r8 / (1._r8 - t)
+      !      !f_s1s3(c, j) = .004_r8 / (1._r8 - t)
+      !      !rf_s1s2(c, j) = t
+      !      !rf_s1s3(c, j) = t
+      !      rf_s1s2 = 1.0_r8 - params_inst%cue_0  ! intialise CUE to the default value at 15 C.  Time dependent loop will vary CUE with soil temperature as function of layer.
+      !   end do
+      !end do
       initial_stock_soildepth = params_inst%bgc_initial_Cstocks_depth
 
       !-------------------  list of pools and their attributes  ------------
@@ -361,10 +369,10 @@ contains
 
       i_litr_max = i_lig_lit
       if (i_litr_min /= 1 .or. i_litr_max < 2 .or. i_litr_max > 3) then
-         write(iulog,*) 'Expecting i_litr_min = 1 and i_litr_max = 2 or 3.'
-         write(iulog,*) 'See pftconMod, SoilBiogeochemCarbonFluxType, and'
-         write(iulog,*) 'clmfates_interfaceMod for ramifications of changing'
-         write(iulog,*) 'this assumption.'
+         write(iulog, *) 'Expecting i_litr_min = 1 and i_litr_max = 2 or 3.'
+         write(iulog, *) 'See pftconMod, SoilBiogeochemCarbonFluxType, and'
+         write(iulog, *) 'clmfates_interfaceMod for ramifications of changing'
+         write(iulog, *) 'this assumption.'
          call endrun(msg='ERROR: i_litr_min and/or i_litr_max out of range '// &
               errMsg(sourcefile, __LINE__))
       end if
@@ -436,7 +444,7 @@ contains
 
       !lit1
       spinup_factor(i_met_lit) = 1._r8
-      !lit2,3
+      !lit2, 3
       spinup_factor(i_cel_lit) = 1._r8
       spinup_factor(i_lig_lit) = 1._r8
       !CWD
@@ -445,13 +453,13 @@ contains
       end if
       !som1
       spinup_factor(i_doc_som) = 1._r8
-      !som2,3
+      !som2, 3
       spinup_factor(i_mic_som) = max(1._r8, (speedup_fac * params_inst%tau_s2_bgc))
       spinup_factor(i_mac_som) = max(1._r8, (speedup_fac * params_inst%tau_s3_bgc))
 
       if ( masterproc ) then
-         write(iulog,*) 'Spinup_state ',spinup_state
-         write(iulog,*) 'Spinup factors ',spinup_factor
+         write(iulog, *) 'Spinup_state ', spinup_state
+         write(iulog, *) 'Spinup factors ', spinup_factor
       end if
 
       !----------------  list of transitions and their time-independent coefficients  ---------------!
@@ -545,7 +553,7 @@ contains
     ! !LOCAL VARIABLES:
     real(r8), parameter :: eps = 1.e-6_r8
     real(r8):: frw(bounds%begc:bounds%endc) ! rooting fraction weight
-    real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth
+    real(r8), allocatable:: fr(:, :)         ! column-level rooting fraction by soil depth
     real(r8):: psi                          ! temporary soilpsi for water scalar
     real(r8):: rate_scalar                  ! combined rate scalar for decomp
     real(r8):: k_l1                         ! decomposition rate constant litter 1 (1/sec)
@@ -563,7 +571,7 @@ contains
     real(r8):: t1                           ! temperature argument
     real(r8):: normalization_factor         ! factor by which to offset the decomposition rates frm century to a q10 formulation
     real(r8):: days_per_year                ! days per year
-    real(r8):: depth_scalar(bounds%begc:bounds%endc,1:nlevdecomp)
+    real(r8):: depth_scalar(bounds%begc:bounds%endc, 1:nlevdecomp)
     real(r8):: mino2lim                     !minimum anaerobic decomposition rate
     real(r8):: spinup_geogterm_l1(bounds%begc:bounds%endc) ! geographically-varying spinup term for l1
     real(r8):: spinup_geogterm_l23(bounds%begc:bounds%endc) ! geographically-varying spinup term for l2 and l3
@@ -575,7 +583,7 @@ contains
     !-----------------------------------------------------------------------
 
     !----- CENTURY T response function
-    catanf(t1) = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
+    catanf(t1) = 11.75_r8 + (29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
 
     associate(                                                           &
          cwd_flig       => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
@@ -583,9 +591,7 @@ contains
          minpsi         => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
          maxpsi         => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
          soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
-
          t_soisno       => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-
          o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
@@ -628,7 +634,7 @@ contains
       catanf_30 = catanf(30._r8)
 
       if ( spinup_state >= 1 ) then
-         do fc = 1,num_soilc
+         do fc = 1, num_soilc
             c = filter_soilc(fc)
             !
             if ( abs(spinup_factor(i_met_lit) - 1._r8) .gt. eps) then
@@ -671,7 +677,7 @@ contains
             !
          end do
       else
-         do fc = 1,num_soilc
+         do fc = 1, num_soilc
             c = filter_soilc(fc)
             spinup_geogterm_l1(c) = 1._r8
             spinup_geogterm_l23(c) = 1._r8
@@ -692,21 +698,21 @@ contains
          ! the following normalizes values in fr so that they
          ! sum to 1.0 across top nlevdecomp levels on a column
          frw(bounds%begc:bounds%endc) = 0._r8
-         nlev_soildecomp_standard=5
-         allocate(fr(bounds%begc:bounds%endc,nlev_soildecomp_standard))
-         do j=1,nlev_soildecomp_standard
-            do fc = 1,num_soilc
+         nlev_soildecomp_standard = 5
+         allocate(fr(bounds%begc:bounds%endc, nlev_soildecomp_standard))
+         do j=1, nlev_soildecomp_standard
+            do fc = 1, num_soilc
                c = filter_soilc(fc)
-               frw(c) = frw(c) + col%dz(c,j)
+               frw(c) = frw(c) + col%dz(c, j)
             end do
          end do
-         do j = 1,nlev_soildecomp_standard
-            do fc = 1,num_soilc
+         do j = 1, nlev_soildecomp_standard
+            do fc = 1, num_soilc
                c = filter_soilc(fc)
                if (frw(c) /= 0._r8) then
-                  fr(c,j) = col%dz(c,j) / frw(c)
+                  fr(c, j) = col%dz(c, j) / frw(c)
                else
-                  fr(c,j) = 0._r8
+                  fr(c, j) = 0._r8
                end if
             end do
          end do
@@ -716,28 +722,28 @@ contains
             ! assuming that the base rate constants are assigned for non-moisture
             ! limiting conditions at 25 C.
 
-            do j = 1,nlev_soildecomp_standard
-               do fc = 1,num_soilc
+            do j = 1, nlev_soildecomp_standard
+               do fc = 1, num_soilc
                   c = filter_soilc(fc)
-                  if (j==1) t_scalar(c,:) = 0._r8
-                  if (t_soisno(c,j) >= SHR_CONST_TKFRZ) then
-                     t_scalar(c,1)=t_scalar(c,1) + &
-                          (Q10**((t_soisno(c,j)-(SHR_CONST_TKFRZ+25._r8))/10._r8))*fr(c,j)
+                  if (j==1) t_scalar(c, :) = 0._r8
+                  if (t_soisno(c, j) >= SHR_CONST_TKFRZ) then
+                     t_scalar(c, 1) = t_scalar(c, 1) + &
+                          (Q10**((t_soisno(c, j) - (SHR_CONST_TKFRZ + 25._r8))/10._r8)) * fr(c, j)
                   else
-                     t_scalar(c,1)=t_scalar(c,1) + &
-                          (Q10**(-25._r8/10._r8))*(froz_q10**((t_soisno(c,j)-SHR_CONST_TKFRZ)/10._r8))*fr(c,j)
+                     t_scalar(c, 1) = t_scalar(c, 1) + &
+                          (Q10**(-25._r8/10._r8)) * (froz_q10**((t_soisno(c, j) - SHR_CONST_TKFRZ)/10._r8)) * fr(c, j)
                   endif
                end do
             end do
 
          else
             ! original century uses an arctangent function to calculate the temperature dependence of decomposition
-            do j = 1,nlev_soildecomp_standard
-               do fc = 1,num_soilc
+            do j = 1, nlev_soildecomp_standard
+               do fc = 1, num_soilc
                   c = filter_soilc(fc)
-                  if (j==1) t_scalar(c,:) = 0._r8
+                  if (j==1) t_scalar(c, :) = 0._r8
 
-                  t_scalar(c,1)=t_scalar(c,1) +max(catanf(t_soisno(c,j)-SHR_CONST_TKFRZ)/catanf_30*fr(c,j),0.01_r8)
+                  t_scalar(c, 1) = t_scalar(c, 1) + max(catanf(t_soisno(c, j) - SHR_CONST_TKFRZ) / catanf_30 * fr(c, j), 0.01_r8)
                end do
             end do
 
@@ -751,14 +757,14 @@ contains
          ! Orchard, V.A., and F.J. Cook, 1983. Relationship between soil respiration
          ! and soil moisture. Soil Biol. Biochem., 15(4):447-453.
 
-         do j = 1,nlev_soildecomp_standard
-            do fc = 1,num_soilc
+         do j = 1, nlev_soildecomp_standard
+            do fc = 1, num_soilc
                c = filter_soilc(fc)
                if (j==1) w_scalar(c,:) = 0._r8
-               psi = min(soilpsi(c,j),maxpsi)
+               psi = min(soilpsi(c, j), maxpsi)
                ! decomp only if soilpsi is higher than minpsi
                if (psi > minpsi) then
-                  w_scalar(c,1) = w_scalar(c,1) + (log(minpsi/psi)/log(minpsi/maxpsi))*fr(c,j)
+                  w_scalar(c, 1) = w_scalar(c, 1) + (log(minpsi/psi)/log(minpsi/maxpsi))*fr(c, j)
                end if
             end do
          end do
@@ -768,20 +774,20 @@ contains
             if (anoxia) then
                ! Check for anoxia w/o LCH4 now done in controlMod.
 
-               do j = 1,nlev_soildecomp_standard
-                  do fc = 1,num_soilc
+               do j = 1, nlev_soildecomp_standard
+                  do fc = 1, num_soilc
                      c = filter_soilc(fc)
 
-                     if (j==1) o_scalar(c,:) = 0._r8
+                     if (j==1) o_scalar(c, :) = 0._r8
 
-                     o_scalar(c,1) = o_scalar(c,1) + fr(c,j) * max(o2stress_unsat(c,j), mino2lim)
+                     o_scalar(c, 1) = o_scalar(c, 1) + fr(c, j) * max(o2stress_unsat(c, j), mino2lim)
                   end do
                end do
             else
-               o_scalar(bounds%begc:bounds%endc,1:nlevdecomp) = 1._r8
+               o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
             end if
          else
-            o_scalar(bounds%begc:bounds%endc,1:nlevdecomp) = 1._r8
+            o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
          end if
 
          deallocate(fr)
@@ -799,12 +805,12 @@ contains
             ! the base rates at 25 C, which are calibrated from microcosm studies.
 
             do j = 1, nlevdecomp
-               do fc = 1,num_soilc
+               do fc = 1, num_soilc
                   c = filter_soilc(fc)
-                  if (t_soisno(c,j) >= SHR_CONST_TKFRZ) then
-                     t_scalar(c,j)= (Q10**((t_soisno(c,j)-(SHR_CONST_TKFRZ+25._r8))/10._r8))
+                  if (t_soisno(c, j) >= SHR_CONST_TKFRZ) then
+                     t_scalar(c, j) = (Q10**((t_soisno(c, j) - (SHR_CONST_TKFRZ + 25._r8))/10._r8))
                   else
-                     t_scalar(c,j)= (Q10**(-25._r8/10._r8))*(froz_q10**((t_soisno(c,j)-SHR_CONST_TKFRZ)/10._r8))
+                     t_scalar(c, j) = (Q10**(-25._r8/10._r8)) * (froz_q10**((t_soisno(c, j) - SHR_CONST_TKFRZ) / 10._r8))
                   endif
                end do
             end do
@@ -812,9 +818,9 @@ contains
          else
 
             do j = 1, nlevdecomp
-               do fc = 1,num_soilc
+               do fc = 1, num_soilc
                   c = filter_soilc(fc)
-                  t_scalar(c,j)= max(catanf(t_soisno(c,j)-SHR_CONST_TKFRZ)/catanf_30, 0.01_r8)
+                  t_scalar(c, j) = max(catanf(t_soisno(c, j) - SHR_CONST_TKFRZ) / catanf_30, 0.01_r8)
                end do
             end do
 
@@ -828,15 +834,15 @@ contains
          ! Orchard, V.A., and F.J. Cook, 1983. Relationship between soil respiration
          ! and soil moisture. Soil Biol. Biochem., 15(4):447-453.
 
-         do j = 1,nlevdecomp
-            do fc = 1,num_soilc
+         do j = 1, nlevdecomp
+            do fc = 1, num_soilc
                c = filter_soilc(fc)
-               psi = min(soilpsi(c,j),maxpsi)
+               psi = min(soilpsi(c, j), maxpsi)
                ! decomp only if soilpsi is higher than minpsi
                if (psi > minpsi) then
-                  w_scalar(c,j) = (log(minpsi/psi)/log(minpsi/maxpsi))
+                  w_scalar(c, j) = (log(minpsi / psi) / log(minpsi / maxpsi))
                else
-                  w_scalar(c,j) = 0._r8
+                  w_scalar(c, j) = 0._r8
                end if
             end do
          end do
@@ -846,29 +852,29 @@ contains
             ! Check for anoxia w/o LCH4 now done in controlMod.
 
             if (anoxia) then
-               do j = 1,nlevdecomp
-                  do fc = 1,num_soilc
+               do j = 1, nlevdecomp
+                  do fc = 1, num_soilc
                      c = filter_soilc(fc)
 
-                     o_scalar(c,j) = max(o2stress_unsat(c,j), mino2lim)
+                     o_scalar(c, j) = max(o2stress_unsat(c, j), mino2lim)
                   end do
                end do
             else
-               o_scalar(bounds%begc:bounds%endc,1:nlevdecomp) = 1._r8
+               o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
             end if
          else
-            o_scalar(bounds%begc:bounds%endc,1:nlevdecomp) = 1._r8
+            o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
          end if
 
       end if
 
       if ( normalize_q10_to_century_tfunc ) then
          ! scale all decomposition rates by a constant to compensate for offset between original CENTURY temp func and Q10
-         normalization_factor = (catanf(normalization_tref)/catanf_30) / (q10**((normalization_tref-25._r8)/10._r8))
+         normalization_factor = (catanf(normalization_tref) / catanf_30) / (q10**((normalization_tref - 25._r8) / 10._r8))
          do j = 1, nlevdecomp
-            do fc = 1,num_soilc
+            do fc = 1, num_soilc
                c = filter_soilc(fc)
-               t_scalar(c,j) = t_scalar(c,j) * normalization_factor
+               t_scalar(c, j) = t_scalar(c, j) * normalization_factor
             end do
          end do
       endif
@@ -878,56 +884,56 @@ contains
       do j = 1, nlevdecomp
          do fc = 1, num_soilc
             c = filter_soilc(fc)
-            depth_scalar(c,j) = exp(-zsoi(j) / decomp_depth_efolding)
+            depth_scalar(c, j) = exp(-zsoi(j) / decomp_depth_efolding)
          end do
       end do
 
       ! calculate rate constants for all litter and som pools
-      do j = 1,nlevdecomp
-         do fc = 1,num_soilc
+      do j = 1, nlevdecomp
+         do fc = 1, num_soilc
             c = filter_soilc(fc)
-            decomp_k(c,j,i_met_lit) = k_l1    * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_l1(c)
-            decomp_k(c,j,i_cel_lit) = k_l2_l3 * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_l23(c)
-            decomp_k(c,j,i_lig_lit) = k_l2_l3 * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_l23(c)
-            decomp_k(c,j,i_doc_som) = k_s1    * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_s1(c)
-            decomp_k(c,j,i_mic_som) = k_s2    * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_s2(c)
-            decomp_k(c,j,i_mac_som) = k_s3    * t_scalar(c,j) * w_scalar(c,j) * &
-               depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_s3(c)
+            decomp_k(c, j, i_met_lit) = k_l1    * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
+            decomp_k(c, j, i_cel_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_lig_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_doc_som) = k_s1    * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s1(c)
+            decomp_k(c, j, i_mic_som) = k_s2    * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
+            decomp_k(c, j, i_mac_som) = k_s3    * t_scalar(c, j) * w_scalar(c, j) * &
+               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD
             ! on its own structure
             if (.not. use_fates) then
-               decomp_k(c,j,i_cwd) = k_frag * t_scalar(c,j) * w_scalar(c,j) * &
-                  depth_scalar(c,j) * o_scalar(c,j) * spinup_geogterm_cwd(c)
+               decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * &
+                  depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
             end if
          end do
       end do
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l1s1) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l2s1) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l3s2) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s2) = f_s1s2(bounds%begc:bounds%endc,1:nlevdecomp)
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s3) = f_s1s3(bounds%begc:bounds%endc,1:nlevdecomp)
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s1) = f_s2s1
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s3) = f_s2s3
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s3s1) = 1.0_r8
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l1s1) = 1.0_r8
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l2s1) = 1.0_r8
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l3s2) = 1.0_r8
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s2) = f_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp)
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s3) = f_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp)
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s1) = f_s2s1
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s3) = f_s2s3
+      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s3s1) = 1.0_r8
       if (.not. use_fates) then
-         pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl2) = cwd_fcel
-         pathfrac_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl3) = cwd_flig
-         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl2) = rf_cwdl2
-         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_cwdl3) = rf_cwdl2
+         pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl2) = cwd_fcel
+         pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl3) = cwd_flig
+         rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl2) = rf_cwdl2
+         rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl3) = rf_cwdl2
       end if
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l1s1) = rf_l1s1
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l2s1) = rf_l2s1
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_l3s2) = rf_l3s2
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s2) = rf_s1s2(bounds%begc:bounds%endc,1:nlevdecomp)
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s1s3) = rf_s1s3(bounds%begc:bounds%endc,1:nlevdecomp)
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s1) = rf_s2s1
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s2s3) = rf_s2s3
-      rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_s3s1) = rf_s3s1
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l1s1) = rf_l1s1
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l2s1) = rf_l2s1
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l3s2) = rf_l3s2
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s2) = rf_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp)
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s3) = rf_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp)
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s1) = rf_s2s1
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s3) = rf_s2s3
+      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s3s1) = rf_s3s1
 
     end associate
 
