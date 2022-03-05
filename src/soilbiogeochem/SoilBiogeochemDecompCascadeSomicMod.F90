@@ -42,6 +42,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
   !
 
   ! !PRIVATE DATA MEMBERS
+
   ! soil pool indices
   integer, private :: i_mac_som  ! index of mineral-associated Soil Organic Matter (SOM)
   integer, private :: i_mic_som  ! index of active microbial biomass SOM
@@ -95,7 +96,9 @@ module SoilBiogeochemDecompCascadeSOMicMod
      real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
+
   end type params_type
+  !
   type(params_type), private :: params_inst
 
   character(len=*), parameter, private :: sourcefile = __FILE__
@@ -116,7 +119,7 @@ contains
     type(file_desc_t), intent(inout) :: ncid   ! pio netCDF file id
     !
     ! !LOCAL VARIABLES:
-    ! character(len=32)  :: subname = 'CNDecompSOMicParamsType'     ! commented out as does not appear to be used.  consider deleting line.
+    character(len=32)  :: subname = 'CNDecompSOMicParamsType'
     character(len=100) :: errCode = 'Error reading in SOMic const file '
     logical            :: readv   ! has variable been read in or not
     real(r8)           :: tempr   ! temporary to read in constant
@@ -220,7 +223,7 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     tString = 'somic_initial_Cstocks_depth'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
@@ -553,7 +556,7 @@ contains
     ! !LOCAL VARIABLES:
     real(r8), parameter :: eps = 1.e-6_r8
     real(r8):: frw(bounds%begc:bounds%endc) ! rooting fraction weight
-    real(r8), allocatable:: fr(:, :)         ! column-level rooting fraction by soil depth
+    real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth
     real(r8):: psi                          ! temporary soilpsi for water scalar
     real(r8):: rate_scalar                  ! combined rate scalar for decomp
     real(r8):: k_l1                         ! decomposition rate constant litter 1 (1/sec)
@@ -591,7 +594,9 @@ contains
          minpsi         => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
          maxpsi         => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
          soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
+
          t_soisno       => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
+
          o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
