@@ -1,7 +1,7 @@
 module SoilBiogeochemDecompCascadeSOMicMod
   !-----------------------------------------------------------------------
   ! !DESCRIPTION:
-  ! Sets the coeffiecients used in the decomposition submodel.
+  ! Sets the coefficients used in the decomposition submodel.
   ! This uses the SOMic parameters
   !
   ! !USES:
@@ -234,8 +234,9 @@ contains
   subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, soilstate_inst )
     !
     ! !DESCRIPTION:
-    !  initialize rate constants and decomposition pathways following the decomposition cascade of the SOMic model.
-    !  written by D. Woolf
+    !  Initialize rate constants and decomposition pathways following the decomposition cascade of the SOMic model.
+    !  In this subroutine, we only set the time-independent coefficient values
+    !  Written by D. Woolf
     !
     ! !USES:
     !
@@ -247,17 +248,17 @@ contains
     ! !LOCAL VARIABLES
     integer  :: c, j                         ! indices
     real(r8) :: t                            ! temporary variable
-    real(r8) :: cn_dom
-    real(r8) :: cn_mic
-    real(r8) :: cn_mac
+    real(r8) :: cn_dom                       ! C/N ratio of dissolved OM
+    real(r8) :: cn_mic                       ! C/N ratio of microbial biomass
+    real(r8) :: cn_mac                       ! C/N ratio of mineral-associated OM
     real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
-    real(r8) :: clayfact
-    real(r8) :: ksorb_altered
-    real(r8) :: kmicrobial_uptake_altered
-    real(r8) :: fsorb
-    real(r8) :: fmic
-    real(r8) :: kdoc
-    real(r8) :: cue
+    real(r8) :: clayfact                     ! rate modyfying coefficient due to soil clay content
+    real(r8) :: ksorb_altered                ! rate constant for sorption, once rate modyfying sclars have been applied
+    real(r8) :: kmicrobial_uptake_altered    ! rate constant for microbial uptake, once rate modyfying sclars have been applied
+    real(r8) :: fsorb                        ! fraction of doc removals sorbed to mineral surfaces
+    real(r8) :: fmic                         ! fraction of doc removals taken up by microbes
+    real(r8) :: kdoc                         ! rate constant for removal of doc into microbial biomass and mineral-sorption combined
+    real(r8) :: cue                          ! microbial carbon use efficiency (ratio of growth to uptake)
     !-----------------------------------------------------------------------
 
     associate(                                                                                     &
@@ -323,6 +324,7 @@ contains
       initial_stock_soildepth = params_inst%bgc_initial_Cstocks_depth
 
       !-------------------  list of pools and their attributes  ------------
+      !----------------  Litter pools
       i_litr_min = 1
       i_met_lit = i_litr_min
       cn_ratio_is_fixed(i_met_lit) = .true.
@@ -379,11 +381,12 @@ contains
               errMsg(sourcefile, __LINE__))
       end if
 
+      !----------------  SOM pools
       i_doc_som = i_lig_lit + 1
       cn_ratio_is_fixed(i_doc_som) = .false.
       decomp_cascade_con%decomp_pool_name_restart(i_doc_som) = 'soil1'
-      decomp_cascade_con%decomp_pool_name_history(i_doc_som) = 'ACT_SOM'
-      decomp_cascade_con%decomp_pool_name_long(i_doc_som) = 'active soil organic matter'
+      decomp_cascade_con%decomp_pool_name_history(i_doc_som) = 'DOC_SOM'
+      decomp_cascade_con%decomp_pool_name_long(i_doc_som) = 'dissolved soil organic matter'
       decomp_cascade_con%decomp_pool_name_short(i_doc_som) = 'S1'
       is_litter(i_doc_som) = .false.
       is_soil(i_doc_som) = .true.
@@ -395,10 +398,10 @@ contains
       is_lignin(i_doc_som) = .false.
 
       i_mic_som = i_doc_som + 1
-      cn_ratio_is_fixed(i_mic_som) = .false.
+      cn_ratio_is_fixed(i_mic_som) = .true.
       decomp_cascade_con%decomp_pool_name_restart(i_mic_som) = 'soil2'
-      decomp_cascade_con%decomp_pool_name_history(i_mic_som) = 'SLO_SOM'
-      decomp_cascade_con%decomp_pool_name_long(i_mic_som) = 'slow soil organic matter'
+      decomp_cascade_con%decomp_pool_name_history(i_mic_som) = 'MIC_SOM'
+      decomp_cascade_con%decomp_pool_name_long(i_mic_som) = 'microbial soil organic matter'
       decomp_cascade_con%decomp_pool_name_short(i_mic_som) = 'S2'
       is_litter(i_mic_som) = .false.
       is_soil(i_mic_som) = .true.
@@ -412,8 +415,8 @@ contains
       i_mac_som = i_mic_som + 1
       cn_ratio_is_fixed(i_mac_som) = .false.
       decomp_cascade_con%decomp_pool_name_restart(i_mac_som) = 'soil3'
-      decomp_cascade_con%decomp_pool_name_history(i_mac_som) = 'PAS_SOM'
-      decomp_cascade_con%decomp_pool_name_long(i_mac_som) = 'passive soil organic matter'
+      decomp_cascade_con%decomp_pool_name_history(i_mac_som) = 'MAC_SOM'
+      decomp_cascade_con%decomp_pool_name_long(i_mac_som) = 'mineral-associated soil organic matter'
       decomp_cascade_con%decomp_pool_name_short(i_mac_som) = 'S3'
       is_litter(i_mac_som) = .false.
       is_soil(i_mac_som) = .true.
@@ -424,6 +427,7 @@ contains
       is_cellulose(i_mac_som) = .false.
       is_lignin(i_mac_som) = .false.
 
+      !----------------  Coarse woody debris pool
       if (.not. use_fates) then
          ! CWD
          i_cwd = i_mac_som + 1
@@ -442,23 +446,17 @@ contains
          is_lignin(i_cwd) = .false.
       endif
 
+      !------------------  Set factor scalars for accelerated spin-up  ---------------!
       speedup_fac = 1._r8
-
-      !lit1
       spinup_factor(i_met_lit) = 1._r8
-      !lit2, 3
       spinup_factor(i_cel_lit) = 1._r8
       spinup_factor(i_lig_lit) = 1._r8
-      !CWD
       if (.not. use_fates) then
          spinup_factor(i_cwd) = max(1._r8, (speedup_fac * CNParamsShareInst%tau_cwd / 2._r8 ))
       end if
-      !som1
       spinup_factor(i_doc_som) = 1._r8
-      !som2, 3
       spinup_factor(i_mic_som) = max(1._r8, (speedup_fac * params_inst%tau_s2_bgc))
       spinup_factor(i_mac_som) = max(1._r8, (speedup_fac * params_inst%tau_s3_bgc))
-
       if ( masterproc ) then
          write(iulog, *) 'Spinup_state ', spinup_state
          write(iulog, *) 'Spinup factors ', spinup_factor
@@ -475,10 +473,10 @@ contains
       donor_pool(i_l2s1) = i_cel_lit
       receiver_pool(i_l2s1) = i_doc_som
 
-      i_l3s2 = 3
-      decomp_cascade_con%cascade_step_name(i_l3s2) = 'L3S2'
-      donor_pool(i_l3s2) = i_lig_lit
-      receiver_pool(i_l3s2) = i_mic_som
+      i_l3s1 = 3
+      decomp_cascade_con%cascade_step_name(i_l3s1) = 'L3S2'
+      donor_pool(i_l3s1) = i_lig_lit
+      receiver_pool(i_l3s1) = i_doc_som
 
       i_s1s2 = 4
       decomp_cascade_con%cascade_step_name(i_s1s2) = 'S1S2'
@@ -495,12 +493,7 @@ contains
       donor_pool(i_s2s1) = i_mic_som
       receiver_pool(i_s2s1) = i_doc_som
 
-      i_s2s3 = 7
-      decomp_cascade_con%cascade_step_name(i_s2s3) = 'S2S3'
-      donor_pool(i_s2s3) = i_mic_som
-      receiver_pool(i_s2s3) = i_mac_som
-
-      i_s3s1 = 8
+      i_s3s1 = 7
       decomp_cascade_con%cascade_step_name(i_s3s1) = 'S3S1'
       donor_pool(i_s3s1) = i_mac_som
       receiver_pool(i_s3s1) = i_doc_som
@@ -518,9 +511,7 @@ contains
       end if
 
       deallocate(params_inst%bgc_initial_Cstocks)
-
     end associate
-
   end subroutine init_decompcascade_bgc
 
 
