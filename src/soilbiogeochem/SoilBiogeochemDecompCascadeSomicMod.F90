@@ -517,17 +517,19 @@ contains
 
 
 
-
-
+  !----- CENTURY T response function
+  real(r8) function ft_somic(t1)
+    real(r8), intent(in) :: t1
+    ft_somic = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan(SHR_CONST_PI * 0.031_r8  * (t1 - 15.4_r8))
+  end function ft_somic
 
 
   !-----------------------------------------------------------------------
-  subroutine decomp_rate_constants_bgc(bounds, num_soilc, filter_soilc, &
-       soilstate_inst, temperature_inst, ch4_inst, soilbiogeochem_carbonflux_inst)
+  subroutine decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, ch4_inst, soilbiogeochem_carbonflux_inst)
     !
     ! !DESCRIPTION:
-    !  calculate rate constants and decomposition pathways for the CENTURY decomposition cascade model
-    !  written by C. Koven based on original CLM4 decomposition cascade
+    !  calculate rate constants and decomposition pathways for the SOMic decomposition model
+    !  written by D. Woolf, based on CLM5 bgc decomposition cascade
     !
     ! !USES:
     use clm_time_manager , only : get_average_days_per_year
@@ -559,15 +561,16 @@ contains
     real(r8):: froz_q10                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
     real(r8):: decomp_depth_efolding        ! (meters) e-folding depth for reduction in decomposition [
     integer :: c, fc, j, k, l
-    real(r8):: catanf                       ! hyperbolic temperature function from CENTURY
-    real(r8):: catanf_30                    ! reference rate at 30C
+    real(r8):: ft_somic                       ! hyperbolic temperature function from CENTURY
+    real(r8):: ft_somic_30                    ! reference rate at 30C
     real(r8):: t1                           ! temperature argument
     real(r8):: normalization_factor         ! factor by which to offset the decomposition rates frm century to a q10 formulation
     real(r8):: days_per_year                ! days per year
     real(r8):: depth_scalar(bounds%begc:bounds%endc, 1:nlevdecomp)
     real(r8):: mino2lim                     !minimum anaerobic decomposition rate
     real(r8):: spinup_geogterm_l1(bounds%begc:bounds%endc) ! geographically-varying spinup term for l1
-    real(r8):: spinup_geogterm_l23(bounds%begc:bounds%endc) ! geographically-varying spinup term for l2 and l3
+    real(r8):: spinup_geogterm_l2(bounds%begc:bounds%endc) ! geographically-varying spinup term for l2
+    real(r8):: spinup_geogterm_l3(bounds%begc:bounds%endc) ! geographically-varying spinup term for l3
     real(r8):: spinup_geogterm_cwd(bounds%begc:bounds%endc) ! geographically-varying spinup term for cwd
     real(r8):: spinup_geogterm_s1(bounds%begc:bounds%endc) ! geographically-varying spinup term for s1
     real(r8):: spinup_geogterm_s2(bounds%begc:bounds%endc) ! geographically-varying spinup term for s2
@@ -576,7 +579,8 @@ contains
     !-----------------------------------------------------------------------
 
     !----- CENTURY T response function
-    catanf(t1) = 11.75_r8 + (29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
+    ! use of statement functions is obsolete since Fortran 95.  Therefore redefine this as an internal function.
+    ! ft_somic(t1) = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
 
     associate(                                                           &
          cwd_flig       => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
@@ -596,7 +600,9 @@ contains
          w_scalar       => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
          o_scalar       => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
          decomp_k       => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
-         spinup_factor  => decomp_cascade_con%spinup_factor              & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         spinup_factor  => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         begc           => bounds%begc                                 , &
+         endc           => bounds%endc                                   &
          )
 
       mino2lim = CNParamsShareInst%mino2lim
@@ -605,8 +611,6 @@ contains
          call endrun(msg='ERROR: cannot have both use_century_tfunc and normalize_q10_to_century_tfunc set as true'//&
               errMsg(sourcefile, __LINE__))
       endif
-
-      days_per_year = get_average_days_per_year()
 
       ! set "Q10" parameter
       Q10 = CNParamsShareInst%Q10
@@ -618,15 +622,17 @@ contains
       decomp_depth_efolding = CNParamsShareInst%decomp_depth_efolding
 
       ! translate to per-second time constant
-      k_l1 = 1._r8    / (secspday * days_per_year * params_inst%tau_l1_bgc)
-      k_l2_l3 = 1._r8 / (secspday * days_per_year * params_inst%tau_l2_l3_bgc)
-      k_s1 = 1._r8    / (secspday * days_per_year * params_inst%tau_s1_bgc)
-      k_s2 = 1._r8    / (secspday * days_per_year * params_inst%tau_s2_bgc)
-      k_s3 = 1._r8    / (secspday * days_per_year * params_inst%tau_s3_bgc)
+      k_l1s1 = params_inst%k_l1s1
+      k_l2s1 = params_inst%k_l2s1
+      k_l3s1 = params_inst%k_l3s1
+      k_s1s2 = params_inst%k_s1s2
+      k_s1s3 = params_inst%k_s1s3
+      k_s2s1 = params_inst%k_s2s1
+      k_s3s1 = params_inst%k_s3s1
       k_frag = 1._r8  / (secspday * days_per_year * CNParamsShareInst%tau_cwd)
 
      ! calc ref rate
-      catanf_30 = catanf(30._r8)
+      ft_somic_30 = ft_somic(30._r8)
 
       if ( spinup_state >= 1 ) then
          do fc = 1, num_soilc
@@ -639,9 +645,15 @@ contains
             endif
             !
             if ( abs(spinup_factor(i_cel_lit) - 1._r8) .gt. eps) then
-               spinup_geogterm_l23(c) = spinup_factor(i_cel_lit) * get_spinup_latitude_term(grc%latdeg(col%gridcell(c)))
+               spinup_geogterm_l2(c) = spinup_factor(i_cel_lit) * get_spinup_latitude_term(grc%latdeg(col%gridcell(c)))
             else
-               spinup_geogterm_l23(c) = 1._r8
+               spinup_geogterm_l2(c) = 1._r8
+            endif
+            !
+            if ( abs(spinup_factor(i_lig_lit) - 1._r8) .gt. eps) then
+               spinup_geogterm_l3(c) = spinup_factor(i_lig_lit) * get_spinup_latitude_term(grc%latdeg(col%gridcell(c)))
+            else
+               spinup_geogterm_l3(c) = 1._r8
             endif
             !
             if ( .not. use_fates ) then
@@ -674,12 +686,13 @@ contains
       else
          do fc = 1, num_soilc
             c = filter_soilc(fc)
-            spinup_geogterm_l1(c) = 1._r8
-            spinup_geogterm_l23(c) = 1._r8
+            spinup_geogterm_l1(c)  = 1._r8
+            spinup_geogterm_l2(c)  = 1._r8
+            spinup_geogterm_l3(c)  = 1._r8
+            spinup_geogterm_s1(c)  = 1._r8
+            spinup_geogterm_s2(c)  = 1._r8
+            spinup_geogterm_s3(c)  = 1._r8
             spinup_geogterm_cwd(c) = 1._r8
-            spinup_geogterm_s1(c) = 1._r8
-            spinup_geogterm_s2(c) = 1._r8
-            spinup_geogterm_s3(c) = 1._r8
          end do
       endif
 
@@ -689,12 +702,11 @@ contains
          ! calculate function to weight the temperature and water potential scalars
          ! for decomposition control.
 
-
          ! the following normalizes values in fr so that they
          ! sum to 1.0 across top nlevdecomp levels on a column
-         frw(bounds%begc:bounds%endc) = 0._r8
+         frw(begc:endc) = 0._r8
          nlev_soildecomp_standard = 5
-         allocate(fr(bounds%begc:bounds%endc, nlev_soildecomp_standard))
+         allocate(fr(begc:endc, nlev_soildecomp_standard))
          do j=1, nlev_soildecomp_standard
             do fc = 1, num_soilc
                c = filter_soilc(fc)
@@ -722,11 +734,9 @@ contains
                   c = filter_soilc(fc)
                   if (j==1) t_scalar(c, :) = 0._r8
                   if (t_soisno(c, j) >= SHR_CONST_TKFRZ) then
-                     t_scalar(c, 1) = t_scalar(c, 1) + &
-                          (Q10**((t_soisno(c, j) - (SHR_CONST_TKFRZ + 25._r8))/10._r8)) * fr(c, j)
+                     t_scalar(c, 1) = t_scalar(c, 1) + (Q10**((t_soisno(c, j) - (SHR_CONST_TKFRZ + 25._r8))/10._r8)) * fr(c, j)
                   else
-                     t_scalar(c, 1) = t_scalar(c, 1) + &
-                          (Q10**(-25._r8/10._r8)) * (froz_q10**((t_soisno(c, j) - SHR_CONST_TKFRZ)/10._r8)) * fr(c, j)
+                     t_scalar(c, 1) = t_scalar(c, 1) + (Q10**(-25._r8/10._r8)) * (froz_q10**((t_soisno(c, j) - SHR_CONST_TKFRZ)/10._r8)) * fr(c, j)
                   endif
                end do
             end do
@@ -738,7 +748,7 @@ contains
                   c = filter_soilc(fc)
                   if (j==1) t_scalar(c, :) = 0._r8
 
-                  t_scalar(c, 1) = t_scalar(c, 1) + max(catanf(t_soisno(c, j) - SHR_CONST_TKFRZ) / catanf_30 * fr(c, j), 0.01_r8)
+                  t_scalar(c, 1) = t_scalar(c, 1) + max(ft_somic(t_soisno(c, j) - SHR_CONST_TKFRZ) / ft_somic_30 * fr(c, j), 0.01_r8)
                end do
             end do
 
@@ -779,10 +789,10 @@ contains
                   end do
                end do
             else
-               o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
+               o_scalar(begc:endc, 1:nlevdecomp) = 1._r8
             end if
          else
-            o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
+            o_scalar(begc:endc, 1:nlevdecomp) = 1._r8
          end if
 
          deallocate(fr)
@@ -815,7 +825,7 @@ contains
             do j = 1, nlevdecomp
                do fc = 1, num_soilc
                   c = filter_soilc(fc)
-                  t_scalar(c, j) = max(catanf(t_soisno(c, j) - SHR_CONST_TKFRZ) / catanf_30, 0.01_r8)
+                  t_scalar(c, j) = max(ft_somic(t_soisno(c, j) - SHR_CONST_TKFRZ) / ft_somic_30, 0.01_r8)
                end do
             end do
 
@@ -845,7 +855,6 @@ contains
          if (use_lch4) then
             ! Calculate ANOXIA
             ! Check for anoxia w/o LCH4 now done in controlMod.
-
             if (anoxia) then
                do j = 1, nlevdecomp
                   do fc = 1, num_soilc
@@ -855,17 +864,16 @@ contains
                   end do
                end do
             else
-               o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
+               o_scalar(begc:endc, 1:nlevdecomp) = 1._r8
             end if
          else
-            o_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) = 1._r8
+            o_scalar(begc:endc, 1:nlevdecomp) = 1._r8
          end if
-
       end if
 
       if ( normalize_q10_to_century_tfunc ) then
          ! scale all decomposition rates by a constant to compensate for offset between original CENTURY temp func and Q10
-         normalization_factor = (catanf(normalization_tref) / catanf_30) / (q10**((normalization_tref - 25._r8) / 10._r8))
+         normalization_factor = (ft_somic(normalization_tref) / ft_somic_30) / (q10**((normalization_tref - 25._r8) / 10._r8))
          do j = 1, nlevdecomp
             do fc = 1, num_soilc
                c = filter_soilc(fc)
@@ -874,61 +882,45 @@ contains
          end do
       endif
 
-      ! add a term to reduce decomposition rate at depth
-      ! for now used a fixed e-folding depth
-      do j = 1, nlevdecomp
-         do fc = 1, num_soilc
-            c = filter_soilc(fc)
-            depth_scalar(c, j) = exp(-zsoi(j) / decomp_depth_efolding)
-         end do
-      end do
-
       ! calculate rate constants for all litter and som pools
       do j = 1, nlevdecomp
          do fc = 1, num_soilc
             c = filter_soilc(fc)
-            decomp_k(c, j, i_met_lit) = k_l1    * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
-            decomp_k(c, j, i_cel_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
-            decomp_k(c, j, i_lig_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
-            decomp_k(c, j, i_doc_som) = k_s1    * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s1(c)
-            decomp_k(c, j, i_mic_som) = k_s2    * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
-            decomp_k(c, j, i_mac_som) = k_s3    * t_scalar(c, j) * w_scalar(c, j) * &
-               depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
+            decomp_k(c, j, i_met_lit) = k_l1    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
+            decomp_k(c, j, i_cel_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_lig_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_doc_som) = k_s1    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s1(c)
+            decomp_k(c, j, i_mic_som) = k_s2    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
+            decomp_k(c, j, i_mac_som) = k_s3    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD
             ! on its own structure
             if (.not. use_fates) then
-               decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * &
-                  depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
+               decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
             end if
          end do
       end do
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l1s1) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l2s1) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l3s2) = 1.0_r8
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s2) = f_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp)
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s3) = f_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp)
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s1) = f_s2s1
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s3) = f_s2s3
-      pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s3s1) = 1.0_r8
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l1s1) = 1.0_r8
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l2s1) = 1.0_r8
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l3s2) = 1.0_r8
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_s1s2) = f_s1s2(begc:endc, 1:nlevdecomp)
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_s1s3) = f_s1s3(begc:endc, 1:nlevdecomp)
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_s2s1) = f_s2s1
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_s2s3) = f_s2s3
+      pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_s3s1) = 1.0_r8
       if (.not. use_fates) then
-         pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl2) = cwd_fcel
-         pathfrac_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl3) = cwd_flig
-         rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl2) = rf_cwdl2
-         rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_cwdl3) = rf_cwdl2
+         pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl2) = cwd_fcel
+         pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl3) = cwd_flig
+         rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl2) = rf_cwdl2
+         rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl3) = rf_cwdl2
       end if
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l1s1) = rf_l1s1
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l2s1) = rf_l2s1
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_l3s2) = rf_l3s2
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s2) = rf_s1s2(bounds%begc:bounds%endc, 1:nlevdecomp)
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s1s3) = rf_s1s3(bounds%begc:bounds%endc, 1:nlevdecomp)
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s1) = rf_s2s1
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s2s3) = rf_s2s3
-      rf_decomp_cascade(bounds%begc:bounds%endc, 1:nlevdecomp, i_s3s1) = rf_s3s1
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_l1s1) = rf_l1s1
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_l2s1) = rf_l2s1
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_l3s2) = rf_l3s2
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_s1s2) = rf_s1s2(begc:endc, 1:nlevdecomp)
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_s1s3) = rf_s1s3(begc:endc, 1:nlevdecomp)
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_s2s1) = rf_s2s1
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_s2s3) = rf_s2s3
+      rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_s3s1) = rf_s3s1
 
     end associate
 
