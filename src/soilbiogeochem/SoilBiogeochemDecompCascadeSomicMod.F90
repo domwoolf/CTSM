@@ -96,7 +96,6 @@ module SoilBiogeochemDecompCascadeSOMicMod
      real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
-
   end type params_type
   !
   type(params_type), private :: params_inst
