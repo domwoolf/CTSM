@@ -14,13 +14,13 @@ module CNSharedParamsMod
 
   type, public  :: CNParamsShareType
       real(r8) :: Q10                   ! temperature dependence
-      real(r8) :: minpsi                ! minimum soil water potential for heterotrophic resp	  
+      real(r8) :: minpsi                ! minimum soil water potential for heterotrophic resp
       real(r8) :: maxpsi                ! maximum soil water potential for heterotrophic resp
       real(r8) :: rf_cwdl2              ! respiration fraction in CWD to litter2 transition (frac)
       real(r8) :: tau_cwd               ! corrected fragmentation rate constant CWD, century leaves wood decomposition rates open, within range of 0 - 0.5 yr^-1 (1/0.3) (1/yr)
       real(r8) :: cwd_flig              ! lignin fraction of coarse woody debris
       real(r8) :: froz_q10              ! separate q10 for frozen soil respiration rates
-      real(r8) :: decomp_depth_efolding ! e-folding depth for reduction in decomposition (m) 
+      real(r8) :: decomp_depth_efolding ! e-folding depth for reduction in decomposition (m)
       real(r8) :: mino2lim              ! minimum anaerobic decomposition rate as a fraction of potential aerobic rate
       real(r8) :: organic_max           ! organic matter content (kg/m3) where soil is assumed to act like peat
       logical  :: constrain_stress_deciduous_onset ! if true use additional constraint on stress deciduous onset trigger
@@ -36,7 +36,7 @@ module CNSharedParamsMod
   ! Public data
 
   logical, public :: use_fun      = .false.             ! Use the FUN2.0 model
-  integer, public :: nlev_soildecomp_standard = 5
+  integer, public :: nlev_soildecomp_standard = 5       ! Number of soil layers ("levels") in which decomposition model applied
   integer, public :: upper_soil_layer = -1              ! Upper soil layer to use for 10-day average in CNPhenology
 
   ! Private subroutines and data
@@ -46,7 +46,7 @@ module CNSharedParamsMod
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
   !-----------------------------------------------------------------------
-  
+
 contains
 
   !-----------------------------------------------------------------------
@@ -61,7 +61,7 @@ contains
     call CNParamsReadShared_namelist(namelist_file)
 
   end subroutine CNParamsReadShared
-  
+
   !-----------------------------------------------------------------------
 
   subroutine CNParamsSetSoilDepth( )
@@ -96,7 +96,7 @@ contains
     tString='minpsi_hr'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    CNParamsShareInst%minpsi=tempr 
+    CNParamsShareInst%minpsi=tempr
 
     tString='maxpsi_hr'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
@@ -116,7 +116,7 @@ contains
     tString='cwd_flig'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    CNParamsShareInst%cwd_flig=tempr 
+    CNParamsShareInst%cwd_flig=tempr
 
     tString='decomp_depth_efolding'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
@@ -126,13 +126,13 @@ contains
     tString='froz_q10'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    CNParamsShareInst%froz_q10=tempr   
+    CNParamsShareInst%froz_q10=tempr
 
     tString='mino2lim'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    CNParamsShareInst%mino2lim=tempr 
-    !CNParamsShareInst%mino2lim=0.2_r8 
+    CNParamsShareInst%mino2lim=tempr
+    !CNParamsShareInst%mino2lim=0.2_r8
 
     tString='organic_max'
     call ncd_io(trim(tString),tempr, 'read', ncid, readvar=readv)
@@ -140,7 +140,7 @@ contains
     CNParamsShareInst%organic_max=tempr
 
   end subroutine CNParamsReadShared_netcdf
-  
+
   !-----------------------------------------------------------------------
   subroutine CNParamsReadShared_namelist(namelist_file)
     !
@@ -155,13 +155,13 @@ contains
     use clm_varctl  , only : iulog
     use abortutils  , only : endrun
     use shr_mpi_mod , only : shr_mpi_bcast
-    
+
     !
     implicit none
     !
 
     character(len=*), intent(in) :: namelist_file
-    
+
     integer :: i,j,n                ! loop indices
     integer :: ierr                 ! error code
     integer :: unitn                ! unit for namelist file
