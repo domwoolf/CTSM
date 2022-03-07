@@ -310,21 +310,9 @@ contains
       ! set path fractions
       f_s2s1 = 1.0_r8
       f_s3s1 = 1.0_r8
-
       ! Note that some of the rf and f coefficents vary with time, hence not set here.  These include:
       !   rf_s1s2, f_s1s2, f_s1s3
 
-      ! some of these rf and f coefficients are dependent on the soil texture and/or microbial biomass.  define these as for each layer
-      !do c = begc, endc
-      !   do j = 1, nlevdecomp
-      !      !t = 0.85_r8 - 0.68_r8 * 0.01_r8 * (100._r8 - cellsand(c, j))
-      !      !f_s1s2(c, j) = 1._r8 - .004_r8 / (1._r8 - t)
-      !      !f_s1s3(c, j) = .004_r8 / (1._r8 - t)
-      !      !rf_s1s2(c, j) = t
-      !      !rf_s1s3(c, j) = t
-      !      rf_s1s2 = 1.0_r8 - params_inst%cue_0  ! intialise CUE to the default value at 15 C.  Time dependent loop will vary CUE with soil temperature as function of layer.
-      !   end do
-      !end do
       initial_stock_soildepth = params_inst%bgc_initial_Cstocks_depth
 
       !-------------------  list of pools and their attributes  ------------
@@ -562,48 +550,40 @@ contains
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
     !
     ! !LOCAL VARIABLES:
-    integer :: c, fc, j, k, l                               ! indices
-    real(r8), parameter :: eps = 1.e-6_r8                   ! named constant for floating point logic
-    real(r8), parameter :: ref_clay = 23._r8                ! named constant for reference clay content for normalization of sorption rates
-    real(r8):: frw(bounds%begc:bounds%endc)                 ! rooting fraction weight
-    real(r8), allocatable:: fr(:,:)                         ! column-level rooting fraction by soil depth
-    real(r8):: psi                                          ! temporary soilpsi for water scalar
-    !real(r8):: rate_scalar                                 ! combined rate scalar for decomp
-    real(r8) :: clay_scalar                                 ! scalar to modify sorption rate depending on clay content
-    real(r8) :: k_sorb                                      ! temporary sorption rate constant
-    real(r8) :: k_mic_up                                    ! temporary microbial uptake rate constant
-    real(r8) :: f_sorb                                      ! temporary sorption partition fraction
-    real(r8) :: f_mic_up                                    ! temporary microbial uptake partition fraction
-    real(r8) :: f_resp                                      ! temporary respiration fraction
-    !real(r8):: k_l1                                        ! decomposition rate constant litter 1 (1/sec)
-    !real(r8):: k_l2                                        ! decomposition rate constant litter 2 (1/sec)
-    !real(r8):: k_l3                                        ! decomposition rate constant litter 3 (1/sec)
-    !real(r8):: k_s1                                        ! decomposition rate constant SOM 1 (1/sec)
-    !real(r8):: k_s2                                        ! decomposition rate constant SOM 2 (1/sec)
-    !real(r8):: k_s3                                        ! decomposition rate constant SOM 3 (1/sec)
-    real(r8):: k_frag                                       ! fragmentation rate constant CWD (1/sec)
-    real(r8):: Q10                                          ! temperature dependence
-    real(r8):: froz_q10                                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
-    real(r8):: decomp_depth_efolding                        ! (meters) e-folding depth for reduction in decomposition [
-    real(r8):: ft_somic_30                                  ! reference rate at 30C
-    !real(r8):: t1                                          ! temperature argument
-    real(r8):: normalization_factor                         ! factor by which to offset the decomposition rates frm century to a q10 formulation
-    real(r8):: days_per_year                                ! days per year
-    !real(r8):: depth_scalar(bounds%begc:bounds%endc, 1:nlevdecomp)
-    real(r8):: mino2lim                                     ! minimum anaerobic decomposition rate
-    real(r8):: spinup_geogterm_l1(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l1
-    real(r8):: spinup_geogterm_l2(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l2
-    real(r8):: spinup_geogterm_l3(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l3
-    real(r8):: spinup_geogterm_cwd(bounds%begc:bounds%endc) ! geographically-varying spinup term for cwd
-    real(r8):: spinup_geogterm_s1(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s1
-    real(r8):: spinup_geogterm_s2(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s2
-    real(r8):: spinup_geogterm_s3(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s3
+    integer :: c, fc, j, k, l                                ! indices
+    real(r8), parameter :: eps = 1.e-6_r8                    ! named constant for floating point logic
+    real(r8), parameter :: ref_clay = 23._r8                 ! named constant for reference clay content for normalization of sorption rates
+    real(r8) :: frw(bounds%begc:bounds%endc)                 ! rooting fraction weight
+    real(r8), allocatable:: fr(:,:)                          ! column-level rooting fraction by soil depth
+    real(r8) :: psi                                          ! temporary soilpsi for water scalar
+    real(r8) :: k_l1s1                                       ! base rate constant for decomposition of l1
+    real(r8) :: k_l2s1                                       ! base rate constant for decomposition of l2
+    real(r8) :: k_l3s1                                       ! base rate constant for decomposition of l3
+    real(r8) :: k_sorb                                       ! temporary sorption rate constant
+    real(r8) :: k_mic_up                                     ! temporary microbial uptake rate constant
+    real(r8) :: k_s2s1                                       ! base rate constant for loss of microbial biomass (including both death and exudates)
+    real(r8) :: k_s3s1                                       ! base rate constant for desorption of mineral-associated OM
+    real(r8) :: clay_scalar                                  ! scalar to modify sorption rate depending on clay content
+    real(r8) :: f_sorb                                       ! temporary sorption partition fraction
+    real(r8) :: f_mic_up                                     ! temporary microbial uptake partition fraction
+    real(r8) :: f_resp                                       ! temporary respiration fraction
+    real(r8) :: k_frag                                       ! fragmentation rate constant CWD (1/sec)
+    real(r8) :: Q10                                          ! temperature dependence
+    real(r8) :: froz_q10                                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
+    real(r8) :: decomp_depth_efolding                        ! (meters) e-folding depth for reduction in decomposition [
+    real(r8) :: ft_somic_30                                  ! reference rate at 30C
+    real(r8) :: normalization_factor                         ! factor by which to offset the decomposition rates frm century to a q10 formulation
+    real(r8) :: days_per_year                                ! days per year
+    real(r8) :: mino2lim                                     ! minimum anaerobic decomposition rate
+    real(r8) :: spinup_geogterm_l1(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l1
+    real(r8) :: spinup_geogterm_l2(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l2
+    real(r8) :: spinup_geogterm_l3(bounds%begc:bounds%endc)  ! geographically-varying spinup term for l3
+    real(r8) :: spinup_geogterm_cwd(bounds%begc:bounds%endc) ! geographically-varying spinup term for cwd
+    real(r8) :: spinup_geogterm_s1(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s1
+    real(r8) :: spinup_geogterm_s2(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s2
+    real(r8) :: spinup_geogterm_s3(bounds%begc:bounds%endc)  ! geographically-varying spinup term for s3
 
     !-----------------------------------------------------------------------
-
-    !----- CENTURY T response function
-    ! use of statement functions is obsolete since Fortran 95.  Therefore redefine this as an internal function.
-    ! ft_somic(t1) = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
 
     associate(                                                           &
          cwd_flig       => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
@@ -921,14 +901,14 @@ contains
             f_resp   = f_mic_up * (1.0_r8 - cue(t_soisno(c, j)))                                                 ! fraction of doc turnover that is respired to CO2
 
             ! rate constants for decomposition of pools
-            decomp_k(c, j, i_met_lit) = k_l1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
-            decomp_k(c, j, i_cel_lit) = k_l2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l2(c)
-            decomp_k(c, j, i_lig_lit) = k_l3 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l3(c)
+            decomp_k(c, j, i_met_lit) = k_l1s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
+            decomp_k(c, j, i_cel_lit) = k_l2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l2(c)
+            decomp_k(c, j, i_lig_lit) = k_l3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l3(c)
             decomp_k(c, j, i_doc_som) = (pathfrac_decomp_cascade(c, j, i_s1s3) * k_sorb) + &                     ! rate constant for doc loss is...
                                         (pathfrac_decomp_cascade(c, j, i_s1s2) * k_mic_up) * &                   ! ...weighted mean of sorption and microbial uptake
                                         spinup_geogterm_s1(c)
-            decomp_k(c, j, i_mic_som) = k_s2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
-            decomp_k(c, j, i_mac_som) = k_s3 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
+            decomp_k(c, j, i_mic_som) = k_s2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
+            decomp_k(c, j, i_mac_som) = k_s3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD on its own structure
             if (.not. use_fates) then
                decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
