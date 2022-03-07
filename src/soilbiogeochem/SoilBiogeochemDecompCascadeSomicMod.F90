@@ -36,8 +36,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
   public :: decomp_rate_constants_bgc       ! Figure out decomposition rates
   !
   ! !PUBLIC DATA MEMBERS
-  logical , public :: normalize_q10_to_century_tfunc = .true.! do we normalize the century decomp. rates so that they match the CLM Q10 at a given tep?
-  logical , public :: use_century_tfunc = .false.
+  logical , public :: normalize_q10_to_century_tfunc = .true.! do we normalize the century decomp. rates so that they match the CLM Q10 at a given temp?
+  logical , public :: use_century_tfunc = .false.            ! do we use the daycent temperature scalar?
   real(r8), public :: normalization_tref = 15._r8            ! reference temperature for normalizaion (degrees C)
   !
 
@@ -231,7 +231,8 @@ contains
 
 
   !-----------------------------------------------------------------------
-  subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, soilstate_inst )
+  subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, &
+                                      soilstate_inst, soilbiogeochem_carbonstate_inst)
     !
     ! !DESCRIPTION:
     !  Initialize rate constants and decomposition pathways following the decomposition cascade of the SOMic model.
@@ -241,9 +242,11 @@ contains
     ! !USES:
     !
     ! !ARGUMENTS:
-    type(bounds_type)               , intent(in)    :: bounds
-    type(soilbiogeochem_state_type) , intent(inout) :: soilbiogeochem_state_inst
-    type(soilstate_type)            , intent(in)    :: soilstate_inst
+    type(bounds_type)                    , intent(in)    :: bounds
+    type(soilbiogeochem_state_type)      , intent(inout) :: soilbiogeochem_state_inst
+    type(soilstate_type)                 , intent(in)    :: soilstate_inst
+    type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+
     !
     ! !LOCAL VARIABLES
     integer  :: c, j                         ! indices
@@ -278,6 +281,7 @@ contains
          is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose
          is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin
          spinup_factor                  => decomp_cascade_con%spinup_factor                      , & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         decomp_cpools_vr               => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col  , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
          begc                           => bounds%begc                                           , &
          endc                           => bounds%endc                                             &
          )
@@ -447,6 +451,7 @@ contains
       endif
 
       !------------------  Set factor scalars for accelerated spin-up  ---------------!
+      ! for now we set all spinup cators equal to one (i.e. no accelrated spinup).  will revisit this decision during model validation and testing.
       speedup_fac = 1._r8
       spinup_factor(i_met_lit) = 1._r8
       spinup_factor(i_cel_lit) = 1._r8
@@ -455,8 +460,8 @@ contains
          spinup_factor(i_cwd) = max(1._r8, (speedup_fac * CNParamsShareInst%tau_cwd / 2._r8 ))
       end if
       spinup_factor(i_doc_som) = 1._r8
-      spinup_factor(i_mic_som) = max(1._r8, (speedup_fac * params_inst%tau_s2_bgc))
-      spinup_factor(i_mac_som) = max(1._r8, (speedup_fac * params_inst%tau_s3_bgc))
+      spinup_factor(i_mic_som) = 1._r8 ! max(1._r8, (speedup_fac * params_inst%tau_s2_bgc))
+      spinup_factor(i_mac_som) = 1._r8 ! max(1._r8, (speedup_fac * params_inst%tau_s3_bgc))
       if ( masterproc ) then
          write(iulog, *) 'Spinup_state ', spinup_state
          write(iulog, *) 'Spinup factors ', spinup_factor
@@ -520,12 +525,13 @@ contains
   !----- CENTURY T response function
   real(r8) function ft_somic(t1)
     real(r8), intent(in) :: t1
-    ft_somic = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan(SHR_CONST_PI * 0.031_r8  * (t1 - 15.4_r8))
+    ft_somic = 11.75_r8 + (29.7_r8 / SHR_CONST_PI) * atan(SHR_CONST_PI * 0.031_r8  * (t1 - 15.4_r8))
   end function ft_somic
 
 
   !-----------------------------------------------------------------------
-  subroutine decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, ch4_inst, soilbiogeochem_carbonflux_inst)
+  subroutine decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
+                                         ch4_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst)
     !
     ! !DESCRIPTION:
     !  calculate rate constants and decomposition pathways for the SOMic decomposition model
@@ -546,13 +552,15 @@ contains
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
     !
     ! !LOCAL VARIABLES:
-    real(r8), parameter :: eps = 1.e-6_r8
+    integer :: c, fc, j, k, l               ! indices
+    real(r8), parameter :: eps = 1.e-6_r8   ! named constant for floating point logic
     real(r8):: frw(bounds%begc:bounds%endc) ! rooting fraction weight
     real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth
     real(r8):: psi                          ! temporary soilpsi for water scalar
     real(r8):: rate_scalar                  ! combined rate scalar for decomp
     real(r8):: k_l1                         ! decomposition rate constant litter 1 (1/sec)
-    real(r8):: k_l2_l3                      ! decomposition rate constant litter 2 and litter 3 (1/sec)
+    real(r8):: k_l2                         ! decomposition rate constant litter 2 (1/sec)
+    real(r8):: k_l3                         ! decomposition rate constant litter 3 (1/sec)
     real(r8):: k_s1                         ! decomposition rate constant SOM 1 (1/sec)
     real(r8):: k_s2                         ! decomposition rate constant SOM 2 (1/sec)
     real(r8):: k_s3                         ! decomposition rate constant SOM 3 (1/sec)
@@ -560,14 +568,12 @@ contains
     real(r8):: Q10                          ! temperature dependence
     real(r8):: froz_q10                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
     real(r8):: decomp_depth_efolding        ! (meters) e-folding depth for reduction in decomposition [
-    integer :: c, fc, j, k, l
-    real(r8):: ft_somic                       ! hyperbolic temperature function from CENTURY
-    real(r8):: ft_somic_30                    ! reference rate at 30C
+    real(r8):: ft_somic_30                  ! reference rate at 30C
     real(r8):: t1                           ! temperature argument
     real(r8):: normalization_factor         ! factor by which to offset the decomposition rates frm century to a q10 formulation
     real(r8):: days_per_year                ! days per year
     real(r8):: depth_scalar(bounds%begc:bounds%endc, 1:nlevdecomp)
-    real(r8):: mino2lim                     !minimum anaerobic decomposition rate
+    real(r8):: mino2lim                     ! minimum anaerobic decomposition rate
     real(r8):: spinup_geogterm_l1(bounds%begc:bounds%endc) ! geographically-varying spinup term for l1
     real(r8):: spinup_geogterm_l2(bounds%begc:bounds%endc) ! geographically-varying spinup term for l2
     real(r8):: spinup_geogterm_l3(bounds%begc:bounds%endc) ! geographically-varying spinup term for l3
@@ -588,9 +594,7 @@ contains
          minpsi         => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
          maxpsi         => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
          soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
-
          t_soisno       => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-
          o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
@@ -601,6 +605,7 @@ contains
          o_scalar       => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
          decomp_k       => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
          spinup_factor  => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+         decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
          begc           => bounds%begc                                 , &
          endc           => bounds%endc                                   &
          )
@@ -612,16 +617,11 @@ contains
               errMsg(sourcefile, __LINE__))
       endif
 
-      ! set "Q10" parameter
-      Q10 = CNParamsShareInst%Q10
+      Q10 = CNParamsShareInst%Q10                                             ! set "Q10" parameter
+      froz_q10  = CNParamsShareInst%froz_q10                                  ! set "froz_q10" parameter
+      decomp_depth_efolding = CNParamsShareInst%decomp_depth_efolding         ! Set "decomp_depth_efolding" parameter
 
-      ! set "froz_q10" parameter
-      froz_q10  = CNParamsShareInst%froz_q10
-
-      ! Set "decomp_depth_efolding" parameter
-      decomp_depth_efolding = CNParamsShareInst%decomp_depth_efolding
-
-      ! translate to per-second time constant
+      ! base rate constants for transitions (must be in per-second, otherwise we should insert a conversion here)
       k_l1s1 = params_inst%k_l1s1
       k_l2s1 = params_inst%k_l2s1
       k_l3s1 = params_inst%k_l3s1
@@ -631,7 +631,7 @@ contains
       k_s3s1 = params_inst%k_s3s1
       k_frag = 1._r8  / (secspday * days_per_year * CNParamsShareInst%tau_cwd)
 
-     ! calc ref rate
+     ! calculate reference temperature rate scalar
       ft_somic_30 = ft_somic(30._r8)
 
       if ( spinup_state >= 1 ) then
@@ -728,7 +728,6 @@ contains
             ! calculate rate constant scalar for soil temperature
             ! assuming that the base rate constants are assigned for non-moisture
             ! limiting conditions at 25 C.
-
             do j = 1, nlev_soildecomp_standard
                do fc = 1, num_soilc
                   c = filter_soilc(fc)
@@ -742,12 +741,11 @@ contains
             end do
 
          else
-            ! original century uses an arctangent function to calculate the temperature dependence of decomposition
+            ! original daycent uses an arctangent function to calculate the temperature dependence of decomposition
             do j = 1, nlev_soildecomp_standard
                do fc = 1, num_soilc
                   c = filter_soilc(fc)
                   if (j==1) t_scalar(c, :) = 0._r8
-
                   t_scalar(c, 1) = t_scalar(c, 1) + max(ft_somic(t_soisno(c, j) - SHR_CONST_TKFRZ) / ft_somic_30 * fr(c, j), 0.01_r8)
                end do
             end do
@@ -761,7 +759,6 @@ contains
          ! and supported by data in
          ! Orchard, V.A., and F.J. Cook, 1983. Relationship between soil respiration
          ! and soil moisture. Soil Biol. Biochem., 15(4):447-453.
-
          do j = 1, nlev_soildecomp_standard
             do fc = 1, num_soilc
                c = filter_soilc(fc)
@@ -794,10 +791,9 @@ contains
          else
             o_scalar(begc:endc, 1:nlevdecomp) = 1._r8
          end if
-
          deallocate(fr)
 
-      else
+      else ! nlevdecomp is greater than 1
 
          if ( .not. use_century_tfunc ) then
             ! calculate rate constant scalar for soil temperature
@@ -808,13 +804,13 @@ contains
             ! as part of the modifications made to improve the seasonal cycle of
             ! atmospheric CO2 concentration in global simulations. This does not impact
             ! the base rates at 25 C, which are calibrated from microcosm studies.
-
             do j = 1, nlevdecomp
                do fc = 1, num_soilc
                   c = filter_soilc(fc)
                   if (t_soisno(c, j) >= SHR_CONST_TKFRZ) then
                      t_scalar(c, j) = (Q10**((t_soisno(c, j) - (SHR_CONST_TKFRZ + 25._r8))/10._r8))
                   else
+                     ! separate q10 calculation for frozen soils
                      t_scalar(c, j) = (Q10**(-25._r8/10._r8)) * (froz_q10**((t_soisno(c, j) - SHR_CONST_TKFRZ) / 10._r8))
                   endif
                end do
@@ -825,6 +821,7 @@ contains
             do j = 1, nlevdecomp
                do fc = 1, num_soilc
                   c = filter_soilc(fc)
+                  ! t scalar is normalized to 1 at 30C, and cannot be less than 0.01
                   t_scalar(c, j) = max(ft_somic(t_soisno(c, j) - SHR_CONST_TKFRZ) / ft_somic_30, 0.01_r8)
                end do
             end do
@@ -838,7 +835,6 @@ contains
          ! and supported by data in
          ! Orchard, V.A., and F.J. Cook, 1983. Relationship between soil respiration
          ! and soil moisture. Soil Biol. Biochem., 15(4):447-453.
-
          do j = 1, nlevdecomp
             do fc = 1, num_soilc
                c = filter_soilc(fc)
@@ -882,16 +878,64 @@ contains
          end do
       endif
 
+      ! calculate the rate constant scalar for Michaelis-Menten dynamics to relate microbial biomass to rate
+      do j = 1, nlevdecomp
+         do fc = 1, num_soilc
+            c = filter_soilc(fc)
+            m_scalar(c, j) = params_inst%mic_vmax * decomp_cpools_vr(c, j, i_mic_som) / &
+                            (params_inst%mic_km   + decomp_cpools_vr(c, j, i_mic_som))
+         end do
+      end do
+
+
+!    //====================================================================================================================================
+!    // Calculate partition fractions
+!    // -----------------------------
+!    // partitioning of doc between competing processes of sorption and microbial uptake
+!    ksorb_altered = ksorb * clayfact * a[i] * b[i] * c[i]; // sorption rate multiplied by rate modifiers
+!    kmicrobial_uptake_altered = kmicrobial_uptake * mic[i] * a[i] * b[i] * c[i]; // microbial uptake multiplied by modifiers
+!    fsorb = ksorb_altered / (ksorb_altered + kmicrobial_uptake_altered); // fraction of doc turnover sorbed
+!    fmic = 1 - fsorb; // fraction of doc turnover taken up by microbes
+!    kdoc = (fsorb * ksorb_altered) + (fmic * kmicrobial_uptake_altered); // rate constant for doc loss is weighted mean of sorption and microbial uptake
+!    dec_doc[i] = doc[i] * (1 - std::exp(-kdoc));
+!    sorption[i] = dec_doc[i] * fsorb;
+!    microbial_uptake[i] = dec_doc[i] * fmic;
+!    // partitioning of microbial uptake between growth and respiration
+!    cue[i] = calc_cue(temp[i], cue_0, mcue);
+!    growth[i] = cue[i] * microbial_uptake[i];
+!    min_doc[i] = (1- cue[i]) * microbial_uptake[i];               // Mineralization in time period
+!    min_cum[i] = i==0 ? min_doc[i] : min_cum[i-1] + min_doc[i];   // cumulative mineralization
+!
+!    //====================================================================================================================================
+!    // Calculate decomposition rates
+!    // -----------------------------
+!    // Decomposition of non-doc pools
+!    dec_spm[i] = spm[i] * (1 - std::exp(-kdissolution * a[i] * b[i] * c[i] * mic[i]));
+!    dec_ipm[i] = ipm[i] * (1 - std::exp(-kdepoly * a[i] * b[i] * c[i] * mic[i]));
+!    dec_mb[i] = mb[i] * (1 - std::exp(-kdeath_and_exudates * a[i] * b[i] * c[i] * mic[i]));
+!    dec_mac[i] = mac[i] * (1 - std::exp(-kdesorb * a[i] * b[i] * c[i] * mic[i]));
+!    dec_tot[i] = dec_spm[i] + dec_ipm[i] + dec_doc[i] + dec_mb[i] + dec_mac[i];
+!
+
+
+
+
+
+
+
+
+
+
       ! calculate rate constants for all litter and som pools
       do j = 1, nlevdecomp
          do fc = 1, num_soilc
             c = filter_soilc(fc)
-            decomp_k(c, j, i_met_lit) = k_l1    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
-            decomp_k(c, j, i_cel_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
-            decomp_k(c, j, i_lig_lit) = k_l2_l3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
-            decomp_k(c, j, i_doc_som) = k_s1    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s1(c)
-            decomp_k(c, j, i_mic_som) = k_s2    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
-            decomp_k(c, j, i_mac_som) = k_s3    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
+            decomp_k(c, j, i_met_lit) = k_l1 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
+            decomp_k(c, j, i_cel_lit) = k_l2 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_lig_lit) = k_l3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l23(c)
+            decomp_k(c, j, i_doc_som) = k_s1 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s1(c)
+            decomp_k(c, j, i_mic_som) = k_s2 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
+            decomp_k(c, j, i_mac_som) = k_s3 * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD
             ! on its own structure
             if (.not. use_fates) then
@@ -899,6 +943,8 @@ contains
             end if
          end do
       end do
+
+      ! calculate path fractions for each transition between pools
       pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l1s1) = 1.0_r8
       pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l2s1) = 1.0_r8
       pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_l3s2) = 1.0_r8
