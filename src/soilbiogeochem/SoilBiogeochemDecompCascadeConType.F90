@@ -19,7 +19,7 @@ module SoilBiogeochemDecompCascadeConType
   public :: init_decomp_cascade_constants    ! Initialize the constants
   !
   type, public :: decomp_cascade_type
-     !-- properties of each pathway along decomposition cascade 
+     !-- properties of each pathway along decomposition cascade
      character(len=8)  , pointer :: cascade_step_name(:)               ! name of transition
      integer           , pointer :: cascade_donor_pool(:)              ! which pool is C taken from for a given decomposition step
      integer           , pointer :: cascade_receiver_pool(:)           ! which pool is C added to for a given decomposition step
@@ -47,6 +47,7 @@ module SoilBiogeochemDecompCascadeConType
   integer, public, parameter :: no_soil_decomp = 0                     ! No soil decomposition is done
   integer, public, parameter :: century_decomp = 1                     ! CENTURY decomposition method type
   integer, public, parameter :: mimics_decomp = 2                      ! MIMICS decomposition method type
+  integer, public, parameter :: somic_decomp = 3                       ! SOMic decomosition method type
   integer, public            :: decomp_method  = ispval                ! Type of decomposition to use
   type(decomp_cascade_type), public :: decomp_cascade_con
   !------------------------------------------------------------------------
@@ -85,12 +86,14 @@ contains
        end if
        close(nu_nml)
        select case( soil_decomp_method )
-       case( 'None' ) 
+       case( 'None' )
           decomp_method = no_soil_decomp
-       case( 'CENTURYKoven2013' ) 
+       case( 'CENTURYKoven2013' )
           decomp_method = century_decomp
        case( 'MIMICSWieder2015' )
           decomp_method = mimics_decomp
+       case( 'SOMicWoolf2019' )
+          decomp_method = somic_decomp
        case default
           call endrun('Bad soil_decomp_method = '//soil_decomp_method )
        end select
@@ -116,6 +119,9 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 7
              ndecomp_cascade_transitions = 14
+          else if (decomp_method == somic_decomp) then
+             ndecomp_pools = 6
+             ndecomp_cascade_transitions = 7
           end if
        else
           if (decomp_method == century_decomp) then
@@ -124,13 +130,17 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 8
              ndecomp_cascade_transitions = 15
+          else if (decomp_method == somic_decomp) then
+             ndecomp_pools = 7
+             ndecomp_cascade_transitions = 9
           end if
-       endif
+       end if
+
        ! The next param also appears as a dimension in the params files dated
        ! c210418.nc and later
        ndecomp_pools_max = 8  ! largest ndecomp_pools value above
     else
-       if ( decomp_method /= no_soil_decomp )then
+       if ( decomp_method /= no_soil_decomp ) then
           call endrun('When running without FATES or BGC soil_decomp_method must be None')
        end if
 
@@ -159,11 +169,11 @@ contains
 
        ibeg = 1
 
-       !-- properties of each pathway along decomposition cascade 
+       !-- properties of each pathway along decomposition cascade
        allocate(decomp_cascade_con%cascade_step_name(1:ndecomp_cascade_transitions))
        allocate(decomp_cascade_con%cascade_donor_pool(1:ndecomp_cascade_transitions))
        allocate(decomp_cascade_con%cascade_receiver_pool(1:ndecomp_cascade_transitions))
-   
+
        !-- properties of each decomposing pool
        allocate(decomp_cascade_con%floating_cn_ratio_decomp_pools(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%decomp_pool_name_restart(ibeg:ndecomp_pools))
@@ -180,12 +190,12 @@ contains
        allocate(decomp_cascade_con%is_cellulose(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_lignin(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%spinup_factor(1:ndecomp_pools))
-   
-       !-- properties of each pathway along decomposition cascade 
+
+       !-- properties of each pathway along decomposition cascade
        decomp_cascade_con%cascade_step_name(1:ndecomp_cascade_transitions) = ''
        decomp_cascade_con%cascade_donor_pool(1:ndecomp_cascade_transitions) = 0
        decomp_cascade_con%cascade_receiver_pool(1:ndecomp_cascade_transitions) = 0
-   
+
        !-- first initialization of properties of each decomposing pool
        decomp_cascade_con%floating_cn_ratio_decomp_pools(ibeg:ndecomp_pools) = .false.
        decomp_cascade_con%decomp_pool_name_history(ibeg:ndecomp_pools)       = ''
