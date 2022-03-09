@@ -492,12 +492,12 @@ contains
       receiver_pool(i_s3s1) = i_doc_som
 
       if (.not. use_fates) then
-         i_cwdl2 = 9
+         i_cwdl2 = 8
          decomp_cascade_con%cascade_step_name(i_cwdl2) = 'CWDL2'
          donor_pool(i_cwdl2) = i_cwd
          receiver_pool(i_cwdl2) = i_cel_lit
 
-         i_cwdl3 = 10
+         i_cwdl3 = 9
          decomp_cascade_con%cascade_step_name(i_cwdl3) = 'CWDL3'
          donor_pool(i_cwdl3) = i_cwd
          receiver_pool(i_cwdl3) = i_lig_lit
