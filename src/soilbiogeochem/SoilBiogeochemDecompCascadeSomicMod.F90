@@ -877,27 +877,21 @@ contains
          end do
       endif
 
-      ! calculate the rate constant scalar for Michaelis-Menten dynamics to relate microbial biomass to rate
-      do j = 1, nlevdecomp
-         do fc = 1, num_soilc
-            c = filter_soilc(fc)
-            m_scalar(c, j) = params_inst%mic_vmax * decomp_cpools_vr(c, j, i_mic_som) / &
-                            (params_inst%mic_km   + decomp_cpools_vr(c, j, i_mic_som))
-         end do
-      end do
-
-
       ! calculate rate constants and path/respiration fractions all litter and som pools and their transitions
       do j = 1, nlevdecomp
          do fc = 1, num_soilc
             c = filter_soilc(fc)
+
+            ! calculate the rate constant scalar for Michaelis-Menten dynamics to relate microbial biomass to rate
+            m_scalar(c, j) = params_inst%mic_vmax * decomp_cpools_vr(c, j, i_mic_som) / &
+                            (params_inst%mic_km   + decomp_cpools_vr(c, j, i_mic_som))
 
             ! partitioning of doc between competing processes of sorption and microbial uptake
             clay_scalar = 1.0_r8 + params_inst%mclay * (clay - ref_clay)
             k_sorb   = params_inst%k_s1s3 * clay_scalar    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified sorption rate
             k_mic_up = params_inst%k_s1s2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified microbial uptake rate
             f_sorb   = k_sorb / (k_sorb + k_mic_up)                                                              ! fraction of doc turnover sorbed
-            f_mic_up = 1.0_r8 - pathfrac_decomp_cascade(c, j, i_s1s3)                                            ! fraction of doc turnover taken up by microbes
+            f_mic_up = 1.0_r8 - f_sorb                                                                           ! fraction of doc turnover taken up by microbes
             f_resp   = f_mic_up * (1.0_r8 - cue(t_soisno(c, j)))                                                 ! fraction of doc turnover that is respired to CO2
 
             ! rate constants for decomposition of pools
