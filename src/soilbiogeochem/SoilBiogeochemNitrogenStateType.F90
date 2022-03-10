@@ -7,20 +7,20 @@ module SoilBiogeochemNitrogenStateType
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use decompMod                          , only : bounds_type
   use abortutils                         , only : endrun
-  use spmdMod                            , only : masterproc 
+  use spmdMod                            , only : masterproc
   use clm_varpar                         , only : ndecomp_cascade_transitions, ndecomp_pools, nlevcan
   use clm_varpar                         , only : nlevdecomp_full, nlevdecomp, nlevsoi
   use clm_varcon                         , only : spval, dzsoi_decomp, zisoi
   use clm_varctl                         , only : use_nitrif_denitrif
-  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, century_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : somic_decomp, mimics_decomp, century_decomp, decomp_method
   use clm_varctl                         , only : iulog, override_bgc_restart_mismatch_dump, spinup_state
-  use landunit_varcon                    , only : istcrop, istsoil 
+  use landunit_varcon                    , only : istcrop, istsoil
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
-  use LandunitType                       , only : lun                
-  use ColumnType                         , only : col                
+  use LandunitType                       , only : lun
+  use ColumnType                         , only : col
   use GridcellType                       , only : grc
   use SoilBiogeochemStateType            , only : get_spinup_latitude_term
-  ! 
+  !
   ! !PUBLIC TYPES:
   implicit none
   private
@@ -60,15 +60,15 @@ module SoilBiogeochemNitrogenStateType
 
    contains
 
-     procedure , public  :: Init   
+     procedure , public  :: Init
      procedure , public  :: Restart
      procedure , public  :: SetValues
      procedure , public  :: Summary
      procedure , public  :: DynamicColumnAdjustments  ! adjust state variables when column areas change
      procedure , public  :: SetTotVgCThresh           ! Set value for totvegcthresh needed in Restart
-     procedure , private :: InitAllocate 
-     procedure , private :: InitHistory  
-     procedure , private :: InitCold     
+     procedure , private :: InitAllocate
+     procedure , private :: InitHistory
+     procedure , private :: InitCold
 
   end type soilbiogeochem_nitrogenstate_type
 
@@ -83,7 +83,7 @@ contains
        decomp_cpools_vr_col, decomp_cpools_col, decomp_cpools_1m_col)
 
     class(soilbiogeochem_nitrogenstate_type)         :: this
-    type(bounds_type) , intent(in)    :: bounds  
+    type(bounds_type) , intent(in)    :: bounds
     real(r8)          , intent(in)    :: decomp_cpools_vr_col (bounds%begc:, 1:, 1:)
     real(r8)          , intent(in)    :: decomp_cpools_col    (bounds%begc:, 1:)
     real(r8)          , intent(in)    :: decomp_cpools_1m_col (bounds%begc:, 1:)
@@ -93,7 +93,7 @@ contains
 
     call this%InitHistory (bounds)
 
-    call this%InitCold ( bounds, & 
+    call this%InitCold ( bounds, &
          decomp_cpools_vr_col, decomp_cpools_col, decomp_cpools_1m_col)
 
   end subroutine Init
@@ -103,7 +103,7 @@ contains
     !
     ! !ARGUMENTS:
     class (soilbiogeochem_nitrogenstate_type) :: this
-    type(bounds_type) , intent(in) :: bounds  
+    type(bounds_type) , intent(in) :: bounds
     !
     ! !LOCAL VARIABLES:
     integer           :: begc,endc
@@ -147,15 +147,15 @@ contains
     ! !USES:
     use clm_varpar , only : ndecomp_cascade_transitions, ndecomp_pools
     use clm_varpar , only : nlevdecomp, nlevdecomp_full, nlevgrnd
-    use histFileMod, only : hist_addfld1d, hist_addfld2d, hist_addfld_decomp 
+    use histFileMod, only : hist_addfld1d, hist_addfld2d, hist_addfld_decomp
     use decompMod  , only : bounds_type
     !
     ! !ARGUMENTS:
     class(soilbiogeochem_nitrogenstate_type) :: this
-    type(bounds_type)         , intent(in) :: bounds 
+    type(bounds_type)         , intent(in) :: bounds
     !
     ! !LOCAL VARIABLES:
-    integer           :: k,l,ii,jj 
+    integer           :: k,l,ii,jj
     character(10)     :: active
     character(8)      :: vr_suffix
     integer           :: begc,endc
@@ -233,7 +233,7 @@ contains
     ! add suffix if number of soil decomposition depths is greater than 1
     if (nlevdecomp > 1) then
        vr_suffix = "_vr"
-    else 
+    else
        vr_suffix = ""
     endif
 
@@ -266,7 +266,7 @@ contains
        endif
     else
        if ( nlevdecomp_full > 1 ) then
-          data2dptr => this%sminn_vr_col(begc:endc,1:nlevsoi) 
+          data2dptr => this%sminn_vr_col(begc:endc,1:nlevsoi)
           call hist_addfld_decomp (fname='SMINN'//trim(vr_suffix), units='gN/m^3', type2d='levsoi', &
                avgflag='A', long_name='soil mineral N', &
                ptr_col=data2dptr)
@@ -323,7 +323,7 @@ contains
     !
     ! !ARGUMENTS:
     class(soilbiogeochem_nitrogenstate_type)      :: this
-    type(bounds_type) , intent(in) :: bounds  
+    type(bounds_type) , intent(in) :: bounds
     real(r8)          , intent(in) :: decomp_cpools_vr_col(bounds%begc:,:,:)
     real(r8)          , intent(in) :: decomp_cpools_col(bounds%begc:,:)
     real(r8)          , intent(in) :: decomp_cpools_1m_col(bounds%begc:,:)
@@ -402,7 +402,7 @@ contains
   !-----------------------------------------------------------------------
   subroutine Restart ( this,  bounds, ncid, flag, totvegc_col )
     !
-    ! !DESCRIPTION: 
+    ! !DESCRIPTION:
     ! Read/write CN restart data for nitrogen state
     !
     ! !USES:
@@ -413,8 +413,8 @@ contains
     !
     ! !ARGUMENTS:
     class (soilbiogeochem_nitrogenstate_type) :: this
-    type(bounds_type)          , intent(in)    :: bounds 
-    type(file_desc_t)          , intent(inout) :: ncid   
+    type(bounds_type)          , intent(in)    :: bounds
+    type(file_desc_t)          , intent(inout) :: ncid
     character(len=*)           , intent(in)    :: flag   !'read' or 'write' or 'define'
     real(r8)                   , intent(in)    :: totvegc_col(bounds%begc:bounds%endc) ! (gC/m2) total vegetation carbon
 
@@ -429,12 +429,12 @@ contains
     real(r8), pointer  :: ptr2d(:,:) ! temp. pointers for slicing larger arrays
     real(r8), pointer  :: ptr1d(:)   ! temp. pointers for slicing larger arrays
     character(len=128) :: varname    ! temporary
-    integer            :: itemp      ! temporary 
+    integer            :: itemp      ! temporary
     integer , pointer  :: iptemp(:)  ! pointer to memory to be allocated
     ! spinup state as read from restart file, for determining whether to enter or exit spinup mode.
-    integer            :: restart_file_spinup_state 
+    integer            :: restart_file_spinup_state
     ! flags for comparing the model and restart decomposition cascades
-    integer            :: decomp_cascade_state, restart_file_decomp_cascade_state 
+    integer            :: decomp_cascade_state, restart_file_decomp_cascade_state
     !------------------------------------------------------------------------
 
     ! sminn
@@ -457,7 +457,7 @@ contains
             dim1name='column', dim2name='levgrnd', switchdim=.true., &
             long_name='', units='gN/m3', &
             scale_by_thickness=.false., &
-            interpinic_flag='interp', readvar=readvar, data=ptr2d) 
+            interpinic_flag='interp', readvar=readvar, data=ptr2d)
        if (flag=='read' .and. .not. readvar) then
           call endrun(msg='ERROR:: '//trim(varname)//' is required on an initialization dataset'//&
                errMsg(sourcefile, __LINE__))
@@ -491,20 +491,22 @@ contains
             dim1name='column', dim2name='levgrnd', switchdim=.true., &
             long_name='', units='gN/m3', &
             scale_by_thickness=.false., &
-            interpinic_flag='interp', readvar=readvar, data=ptr2d) 
+            interpinic_flag='interp', readvar=readvar, data=ptr2d)
        if (flag=='read' .and. .not. readvar) then
           call endrun(msg= 'ERROR:: smin_nh4_vr'//' is required on an initialization dataset' )
        end if
     end if
 
-    ! decomp_cascade_state - the purpose of this is to check to make sure the bgc used 
-    ! matches what the restart file was generated with.  
+    ! decomp_cascade_state - the purpose of this is to check to make sure the bgc used
+    ! matches what the restart file was generated with.
     ! add info about the SOM decomposition cascade
 
     if (decomp_method == century_decomp ) then
        decomp_cascade_state = 1
     else if (decomp_method == mimics_decomp ) then
        decomp_cascade_state = 2
+    else if (decomp_method == somic_decomp ) then
+       decomp_cascade_state = 3
     else
        decomp_cascade_state = 0
     end if
@@ -512,23 +514,23 @@ contains
     if (use_nitrif_denitrif) then
        decomp_cascade_state = decomp_cascade_state + 10
     end if
-    if (flag == 'write') itemp = decomp_cascade_state    
+    if (flag == 'write') itemp = decomp_cascade_state
     call restartvar(ncid=ncid, flag=flag, varname='decomp_cascade_state', xtype=ncd_int,  &
          long_name='BGC of the model that wrote this restart file:' &
-         // '  1s column: 0 = CLM-CN cascade, 1 = Century cascade;' &
+         // '  1s column: 0 = CLM-CN cascade, 1 = Century cascade, 2 = MIMICS, 3 = SOMic;' &
          // ' 10s column: 0 = CLM-CN denitrification, 10 = Century denitrification', units='', &
          interpinic_flag='skip', readvar=readvar, data=itemp)
     if (flag=='read') then
        if (.not. readvar) then
-          ! assume, for sake of backwards compatibility, that if decomp_cascade_state 
-          ! is not in the restart file, then the current model state is the same as 
+          ! assume, for sake of backwards compatibility, that if decomp_cascade_state
+          ! is not in the restart file, then the current model state is the same as
           ! the prior model state
           restart_file_decomp_cascade_state = decomp_cascade_state
           if ( masterproc ) write(iulog,*) ' CNRest: WARNING!  Restart file does not ' &
                // ' contain info on decomp_cascade_state used to generate the restart file.  '
           if ( masterproc ) write(iulog,*) '   Assuming the same as current setting: ', decomp_cascade_state
        else
-          restart_file_decomp_cascade_state = itemp  
+          restart_file_decomp_cascade_state = itemp
           if (decomp_cascade_state /= restart_file_decomp_cascade_state ) then
              if ( masterproc ) then
                 write(iulog,*) 'CNRest: ERROR--the decomposition cascade differs between the current ' &
@@ -562,7 +564,7 @@ contains
        if (readvar) then
           restart_file_spinup_state = idata
        else
-          ! assume, for sake of backwards compatibility, that if spinup_state is not in 
+          ! assume, for sake of backwards compatibility, that if spinup_state is not in
           ! the restart file then current model state is the same as prior model state
           restart_file_spinup_state = spinup_state
           if ( masterproc ) then
@@ -573,11 +575,11 @@ contains
        end if
     end if
 
-    ! now compare the model and restart file spinup states, and either take the 
+    ! now compare the model and restart file spinup states, and either take the
     ! model into spinup mode or out of it if they are not identical
-    ! taking model out of spinup mode requires multiplying each decomposing pool 
+    ! taking model out of spinup mode requires multiplying each decomposing pool
     ! by the associated AD factor.
-    ! putting model into spinup mode requires dividing each decomposing pool 
+    ! putting model into spinup mode requires dividing each decomposing pool
     ! by the associated AD factor.
     ! only allow this to occur on first timestep of model run.
 
@@ -615,21 +617,21 @@ contains
                         get_spinup_latitude_term(grc%latdeg(col%gridcell(c)))
                    ! If there is no vegetation nitrogen,
                    ! implying that all vegetation has
-                   ! died, then 
+                   ! died, then
                    ! reset decomp pools to near zero during exit_spinup to
-                   ! avoid very 
+                   ! avoid very
                    ! large and inert soil carbon stocks; note that only
-                   ! pools with spinup factor > 1 
+                   ! pools with spinup factor > 1
                    ! will be affected, which means that total SOMN and LITN
                    ! pools will not be set to 0.
-                   if (totvegc_col(c) <= this%totvegcthresh .and. lun%itype(l) /= istcrop) then 
+                   if (totvegc_col(c) <= this%totvegcthresh .and. lun%itype(l) /= istcrop) then
                       this%decomp_npools_vr_col(c,j,k) = 0._r8
                    endif
                 elseif ( abs(m - 1._r8) .gt. 0.000001_r8 .and. enter_spinup) then
                    this%decomp_npools_vr_col(c,j,k) = this%decomp_npools_vr_col(c,j,k) * m / &
                         get_spinup_latitude_term(grc%latdeg(col%gridcell(c)))
                 else
-                   this%decomp_npools_vr_col(c,j,k) = this%decomp_npools_vr_col(c,j,k) * m 
+                   this%decomp_npools_vr_col(c,j,k) = this%decomp_npools_vr_col(c,j,k) * m
                 endif
              end do
           end do
@@ -710,7 +712,7 @@ contains
     !
     ! !ARGUMENTS:
     class (soilbiogeochem_nitrogenstate_type) :: this
-    type(bounds_type) , intent(in) :: bounds  
+    type(bounds_type) , intent(in) :: bounds
     integer           , intent(in) :: num_allc       ! number of columns in allc filter
     integer           , intent(in) :: filter_allc(:) ! filter for all active columns
     !
@@ -733,11 +735,11 @@ contains
             this%smin_no3_col(c) = &
                  this%smin_no3_col(c) + &
                  this%smin_no3_vr_col(c,j) * dzsoi_decomp(j)
-            
+
             this%smin_nh4_col(c) = &
                  this%smin_nh4_col(c) + &
                  this%smin_nh4_vr_col(c,j) * dzsoi_decomp(j)
-          end do 
+          end do
        end do
 
     end if
@@ -810,7 +812,7 @@ contains
             end if
          end do
       end if
-      
+
       ! total litter nitrogen to 1 meter (TOTLITN_1m)
       do fc = 1,num_allc
          c = filter_allc(fc)
@@ -826,7 +828,7 @@ contains
             end do
          end if
       end do
-      
+
       ! total soil organic matter nitrogen to 1 meter (TOTSOMN_1m)
       do fc = 1,num_allc
          c = filter_allc(fc)
@@ -841,9 +843,9 @@ contains
             end do
          end if
       end do
-      
+
    endif
-   
+
    ! total litter nitrogen (TOTLITN)
    do fc = 1,num_allc
       c = filter_allc(fc)
@@ -859,7 +861,7 @@ contains
          end do
       end if
    end do
-   
+
    ! total microbial nitrogen (TOTMICN)
    do fc = 1,num_allc
       c = filter_allc(fc)
@@ -890,7 +892,7 @@ contains
          end do
       end if
    end do
-   
+
    ! total cwdn
    do fc = 1,num_allc
       c = filter_allc(fc)
