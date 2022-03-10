@@ -107,7 +107,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
 contains
 
   !-----------------------------------------------------------------------
-  subroutine readParams ( ncid )
+  subroutine readSoilBiogeochemDecompSomicParams ( ncid )
     !
     ! !DESCRIPTION:
     !
@@ -226,7 +226,7 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
-  end subroutine readParams
+  end subroutine readSoilBiogeochemDecompSomicParams
 
 
 
@@ -510,7 +510,7 @@ contains
 
 
 
-  !----- CENTURY T response function
+  !----- Use the CENTURY T response function
   real(r8) function ft_somic(t1)
     real(r8), intent(in) :: t1
     ft_somic = 11.75_r8 + (29.7_r8 / SHR_CONST_PI) * atan(SHR_CONST_PI * 0.031_r8  * (t1 - 15.4_r8))
@@ -595,8 +595,8 @@ contains
          o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
-         rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col                                                               , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
-         pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col                                                         , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
+         rf             => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col       , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
+         pathfrac       => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
          t_scalar       => soilbiogeochem_carbonflux_inst%t_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp
          w_scalar       => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
          o_scalar       => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
@@ -892,15 +892,14 @@ contains
             k_mic_up = params_inst%k_s1s2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified microbial uptake rate
             f_sorb   = k_sorb / (k_sorb + k_mic_up)                                                              ! fraction of doc turnover sorbed
             f_mic_up = 1.0_r8 - f_sorb                                                                           ! fraction of doc turnover taken up by microbes
-            f_resp   = f_mic_up * (1.0_r8 - cue(t_soisno(c, j)))                                                 ! fraction of doc turnover that is respired to CO2
+            f_growth = f_mic_up * cue(t_soisno(c, j))                                                            ! fraction of doc turnover to anabolic growth
+            f_resp   = f_mic_up - f_growth                                                                       ! fraction of doc turnover that is respired to CO2
 
             ! rate constants for decomposition of pools
             decomp_k(c, j, i_met_lit) = k_l1s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
             decomp_k(c, j, i_cel_lit) = k_l2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l2(c)
             decomp_k(c, j, i_lig_lit) = k_l3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l3(c)
-            decomp_k(c, j, i_doc_som) = (pathfrac_decomp_cascade(c, j, i_s1s3) * k_sorb) + &                     ! rate constant for doc loss is...
-                                        (pathfrac_decomp_cascade(c, j, i_s1s2) * k_mic_up) * &                   ! ...weighted mean of sorption and microbial uptake
-                                        spinup_geogterm_s1(c)
+            decomp_k(c, j, i_doc_som) = (fsorb * k_sorb + f_mic_up * k_mic_up) * spinup_geogterm_s1(c)           ! rate constant for doc loss is weighted mean of sorption and microbial uptake
             decomp_k(c, j, i_mic_som) = k_s2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
             decomp_k(c, j, i_mac_som) = k_s3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD on its own structure
@@ -910,34 +909,34 @@ contains
 
             ! Other than doc, which is partitioned between sorption and uptake, all other transitions have a single recipient pool
             ! TO DO: since these never change, we should really just set them once during initialisation
-            pathfrac_decomp_cascade(c, j, i_l1s1) = 1.0_r8
-            pathfrac_decomp_cascade(c, j, i_l2s1) = 1.0_r8
-            pathfrac_decomp_cascade(c, j, i_l3s2) = 1.0_r8
-            pathfrac_decomp_cascade(c, j, i_s1s2) = (1.0_r8 - f_resp) * f_mic_up
-            pathfrac_decomp_cascade(c, j, i_s1s3) = (1.0_r8 - f_resp) * f_sorb
-            pathfrac_decomp_cascade(c, j, i_s2s1) = 1.0_r8
-            pathfrac_decomp_cascade(c, j, i_s2s3) = 1.0_r8
-            pathfrac_decomp_cascade(c, j, i_s3s1) = 1.0_r8
+            pathfrac(c, j, i_l1s1) = 1.0_r8
+            pathfrac(c, j, i_l2s1) = 1.0_r8
+            pathfrac(c, j, i_l3s2) = 1.0_r8
+            pathfrac(c, j, i_s1s2) = f_growth
+            pathfrac(c, j, i_s1s3) = f_sorb
+            pathfrac(c, j, i_s2s1) = 1.0_r8
+            pathfrac(c, j, i_s2s3) = 1.0_r8
+            pathfrac(c, j, i_s3s1) = 1.0_r8
 
             ! Here we set respiration fractions. Note that only microbes respire
-            rf_decomp_cascade(c, j, i_l1s1) = 0.0_r8
-            rf_decomp_cascade(c, j, i_l2s1) = 0.0_r8
-            rf_decomp_cascade(c, j, i_l3s2) = 0.0_r8
-            rf_decomp_cascade(c, j, i_s1s2) = f_resp
-            rf_decomp_cascade(c, j, i_s1s3) = 0.0_r8
-            rf_decomp_cascade(c, j, i_s2s1) = 0.0_r8
-            rf_decomp_cascade(c, j, i_s2s3) = 0.0_r8
-            rf_decomp_cascade(c, j, i_s3s1) = 0.0_r8
+            rf(c, j, i_l1s1) = 0.0_r8
+            rf(c, j, i_l2s1) = 0.0_r8
+            rf(c, j, i_l3s2) = 0.0_r8
+            rf(c, j, i_s1s2) = f_resp
+            rf(c, j, i_s1s3) = 0.0_r8
+            rf(c, j, i_s2s1) = 0.0_r8
+            rf(c, j, i_s2s3) = 0.0_r8
+            rf(c, j, i_s3s1) = 0.0_r8
          end do
       end do
 
       ! calculate path fractions for cwd
       if (.not. use_fates) then
-         pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl2) = cwd_fcel
-         pathfrac_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl3) = cwd_flig
-         rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl2) = rf_cwdl2
-         rf_decomp_cascade(begc:endc, 1:nlevdecomp, i_cwdl3) = rf_cwdl2
+         pathfrac(begc:endc, 1:nlevdecomp, i_cwdl2) = cwd_fcel
+         pathfrac(begc:endc, 1:nlevdecomp, i_cwdl3) = cwd_flig
+         rf(begc:endc, 1:nlevdecomp, i_cwdl2) = rf_cwdl2
+         rf(begc:endc, 1:nlevdecomp, i_cwdl3) = rf_cwdl2
       end if
     end associate
- end subroutine decomp_rate_constants_bgc
-end module SoilBiogeochemDecompCascadeBGCMod
+ end subroutine decomp_rate_constants_somic
+end module SoilBiogeochemDecompCascadeSOMicMod
