@@ -19,6 +19,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
+  use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
   use SoilStateType                      , only : soilstate_type
   use TemperatureType                    , only : temperature_type
   use ch4Mod                             , only : ch4_type
@@ -32,8 +33,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: readParams                      ! Read in parameters from params file
-  public :: init_decompcascade_bgc          ! Initialization
-  public :: decomp_rate_constants_bgc       ! Figure out decomposition rates
+  public :: init_decompcascade_somic        ! Initialization
+  public :: decomp_rate_constants_somic     ! Figure out decomposition rates
   !
   ! !PUBLIC DATA MEMBERS
   logical , public :: normalize_q10_to_century_tfunc = .true.! do we normalize the century decomp. rates so that they match the CLM Q10 at a given temp?
@@ -54,13 +55,13 @@ module SoilBiogeochemDecompCascadeSOMicMod
   real(r8), private :: cwd_fcel  ! cellulose fraction in coarse woody debris
 
   ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes), and cwd decomposition.  The zero rf's are placeholders, that may be removed later.
-  real(r8), private :: rf_l1s1
-  real(r8), private :: rf_l2s1
-  real(r8), private :: rf_l3s1
-  real(r8), private :: rf_s1s2
-  real(r8), private :: rf_s1s3
-  real(r8), private :: rf_s2s1
-  real(r8), private :: rf_s3s1
+  ! real(r8), private :: rf_l1s1
+  ! real(r8), private :: rf_l2s1
+  ! real(r8), private :: rf_l3s1
+  ! real(r8), private :: rf_s1s2
+  ! real(r8), private :: rf_s1s3
+  ! real(r8), private :: rf_s2s1
+  ! real(r8), private :: rf_s3s1
   real(r8), private :: rf_cwdl2
   real(r8), private :: rf_cwdl3
 
@@ -107,7 +108,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
 contains
 
   !-----------------------------------------------------------------------
-  subroutine readSoilBiogeochemDecompSomicParams ( ncid )
+  subroutine readParams ( ncid )
     !
     ! !DESCRIPTION:
     !
@@ -131,10 +132,10 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_fcel = tempr
 
-    tString='bgc_rf_cwdl3'
+    tString='somic_rf_cwdl3'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%rf_cwdl3_bgc=tempr
+    params_inst%rf_cwdl3 = tempr
 
     tString = 'somic_cn_dom'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -226,7 +227,7 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
-  end subroutine readSoilBiogeochemDecompSomicParams
+  end subroutine readParams
 
 
 
@@ -286,7 +287,7 @@ contains
          endc                           => bounds%endc                                             &
          )
 
-      allocate(rf_s1s2(begc:endc, 1:nlevdecomp))
+      ! allocate(rf_s1s2(begc:endc, 1:nlevdecomp))
       allocate( f_s1s2(begc:endc, 1:nlevdecomp))
       allocate( f_s1s3(begc:endc, 1:nlevdecomp))
 
@@ -297,11 +298,11 @@ contains
       cn_s3 = params_inst%cn_mac
 
       ! set respiration fractions for fluxes between compartments.  In Somic model, CO2 is only evolved from microbial biomass thorugh respiration. rf for other transitions is zero.
-      rf_l1s1 = 0.0_r8
-      rf_l2s1 = 0.0_r8
-      rf_l3s1 = 0.0_r8
-      rf_s2s1 = 0.0_r8
-      rf_s3s1 = 0.0_r8
+      ! rf_l1s1 = 0.0_r8
+      ! rf_l2s1 = 0.0_r8
+      ! rf_l3s1 = 0.0_r8
+      ! rf_s2s1 = 0.0_r8
+      ! rf_s3s1 = 0.0_r8
       rf_cwdl3 = params_inst%rf_cwdl3_bgc
 
       ! set the cellulose and lignin fractions for coarse woody debris
@@ -505,7 +506,7 @@ contains
 
       deallocate(params_inst%bgc_initial_Cstocks)
     end associate
-  end subroutine init_decompcascade_bgc
+  end subroutine init_decompcascade_somic
 
 
 
