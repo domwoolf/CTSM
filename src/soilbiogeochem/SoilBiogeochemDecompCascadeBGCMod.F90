@@ -509,6 +509,7 @@ contains
 
   !----- CENTURY T response function
   real(r8) function catanf(t1)
+    use shr_const_mod , only : SHR_CONST_PI
     real(r8), intent(in) :: t1
     catanf = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
   end function catanf
@@ -523,7 +524,7 @@ contains
     !
     ! !USES:
     use clm_time_manager , only : get_average_days_per_year
-    use shr_const_mod    , only : SHR_CONST_PI
+    ! use shr_const_mod    , only : SHR_CONST_PI   ! commented out for now, as its only use was in the catanf statement function, whbich is now internal
     use clm_varcon       , only : secspday
     !
     ! !ARGUMENTS:
@@ -568,7 +569,7 @@ contains
     !-----------------------------------------------------------------------
 
     !----- CENTURY T response function
-    ! use of statement functions is now considered obsolete.  Therefore we redefine catanf as an internal function.
+    ! use of statement functions is deprecated.  Therefore we redefine catanf as an internal function.
     ! catanf(t1) = 11.75_r8 +(29.7_r8 / SHR_CONST_PI) * atan( SHR_CONST_PI * 0.031_r8  * ( t1 - 15.4_r8 ))
 
     associate(                                                           &
