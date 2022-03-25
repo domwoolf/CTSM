@@ -53,6 +53,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
 
   ! cwd variables
   real(r8), private :: cwd_fcel  ! cellulose fraction in coarse woody debris
+  real(r8), private :: rf_cwdl2
+  real(r8), private :: rf_cwdl3
 
   ! respiration fractions by transition - these will all be zero except s1s2 (doc uptake by microbes), and cwd decomposition.  The zero rf's are placeholders, that may be removed later.
   ! real(r8), private :: rf_l1s1
@@ -62,8 +64,6 @@ module SoilBiogeochemDecompCascadeSOMicMod
   ! real(r8), private :: rf_s1s3
   ! real(r8), private :: rf_s2s1
   ! real(r8), private :: rf_s3s1
-  ! real(r8), private :: rf_cwdl2
-  ! real(r8), private :: rf_cwdl3
 
   ! indices of transitions
   integer, private :: i_l1s1
@@ -97,7 +97,6 @@ module SoilBiogeochemDecompCascadeSOMicMod
      real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8) :: rf_cwdl2      ! respiration fraction for CWD to L2
      real(r8) :: rf_cwdl3      ! respiration fraction for CWD to L3
-     real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
   end type params_type
@@ -264,13 +263,13 @@ contains
     real(r8) :: cn_s2                        ! C/N ratio of microbial biomass
     real(r8) :: cn_s3                        ! C/N ratio of mineral-associated OM
     real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
-    real(r8) :: clayfact                     ! rate modyfying coefficient due to soil clay content
-    real(r8) :: ksorb_altered                ! rate constant for sorption, once rate modyfying sclars have been applied
-    real(r8) :: kmicrobial_uptake_altered    ! rate constant for microbial uptake, once rate modyfying sclars have been applied
-    real(r8) :: fsorb                        ! fraction of doc removals sorbed to mineral surfaces
-    real(r8) :: fmic                         ! fraction of doc removals taken up by microbes
-    real(r8) :: kdoc                         ! rate constant for removal of doc into microbial biomass and mineral-sorption combined
-    real(r8) :: cue                          ! microbial carbon use efficiency (ratio of growth to uptake)
+    ! real(r8) :: clayfact                     ! rate modyfying coefficient due to soil clay content
+    ! real(r8) :: ksorb_altered                ! rate constant for sorption, once rate modyfying sclars have been applied
+    ! real(r8) :: kmicrobial_uptake_altered    ! rate constant for microbial uptake, once rate modyfying sclars have been applied
+    ! real(r8) :: fsorb                        ! fraction of doc removals sorbed to mineral surfaces
+    ! real(r8) :: fmic                         ! fraction of doc removals taken up by microbes
+    ! real(r8) :: kdoc                         ! rate constant for removal of doc into microbial biomass and mineral-sorption combined
+    ! real(r8) :: cue                          ! microbial carbon use efficiency (ratio of growth to uptake)
     !-----------------------------------------------------------------------
 
     associate(                                                                                     &
@@ -311,6 +310,7 @@ contains
       ! rf_l3s1 = 0.0_r8
       ! rf_s2s1 = 0.0_r8
       ! rf_s3s1 = 0.0_r8
+      rf_cwdl2 = params_inst%rf_cwdl2
       rf_cwdl3 = params_inst%rf_cwdl3
 
       ! set the cellulose and lignin fractions for coarse woody debris
@@ -583,10 +583,7 @@ contains
     real(r8) :: f_mic_up                                     ! temporary microbial uptake partition fraction
     real(r8) :: f_resp                                       ! temporary respiration fraction
     real(r8) :: k_frag                                       ! fragmentation rate constant CWD (1/sec)
-    real(r8) :: f_sorb                                       ! fraction of doc turnver sorbed to minerals
-    real(r8) :: f_mic_up                                     ! fraction of doc turnver taken up by microbes
     real(r8) :: f_growth                                     ! fraction of microbial uptake allocated to growth
-    real(r8) :: f_resp                                       ! fraction of microbial uptake allocated to respiration
     real(r8) :: Q10                                          ! temperature dependence
     real(r8) :: froz_q10                                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
     real(r8) :: decomp_depth_efolding                        ! (meters) e-folding depth for reduction in decomposition [
@@ -919,12 +916,12 @@ contains
             decomp_k(c, j, i_met_lit) = k_l1s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l1(c)
             decomp_k(c, j, i_cel_lit) = k_l2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l2(c)
             decomp_k(c, j, i_lig_lit) = k_l3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_l3(c)
-            decomp_k(c, j, i_doc_som) = (fsorb * k_sorb + f_mic_up * k_mic_up) * spinup_geogterm_s1(c)           ! rate constant for doc loss is weighted mean of sorption and microbial uptake
+            decomp_k(c, j, i_doc_som) = (f_sorb * k_sorb + f_mic_up * k_mic_up) * spinup_geogterm_s1(c)           ! rate constant for doc loss is weighted mean of sorption and microbial uptake
             decomp_k(c, j, i_mic_som) = k_s2s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s2(c)
             decomp_k(c, j, i_mac_som) = k_s3s1 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_s3(c)
             ! same for cwd but only if fates is not enabled; fates handles CWD on its own structure
             if (.not. use_fates) then
-               decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * depth_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
+               decomp_k(c, j, i_cwd) = k_frag * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j) * spinup_geogterm_cwd(c)
             end if
 
             ! Other than doc, which is partitioned between sorption and uptake, all other transitions have a single recipient pool
