@@ -62,8 +62,8 @@ module SoilBiogeochemDecompCascadeSOMicMod
   ! real(r8), private :: rf_s1s3
   ! real(r8), private :: rf_s2s1
   ! real(r8), private :: rf_s3s1
-  real(r8), private :: rf_cwdl2
-  real(r8), private :: rf_cwdl3
+  ! real(r8), private :: rf_cwdl2
+  ! real(r8), private :: rf_cwdl3
 
   ! indices of transitions
   integer, private :: i_l1s1
@@ -94,6 +94,9 @@ module SoilBiogeochemDecompCascadeSOMicMod
      real(r8) :: k_s3s1        ! rate constant for desorption of MAC to DOC
      real(r8) :: mclay         ! slope of texture dependence scalar as linear function of clay content
      real(r8) :: clay0         ! clay content at which texture-dependence scalar equals 1.0
+     real(r8) :: cwd_fcel      ! cellulose fraction for CWD
+     real(r8) :: rf_cwdl2      ! respiration fraction for CWD to L2
+     real(r8) :: rf_cwdl3      ! respiration fraction for CWD to L3
      real(r8) :: cwd_fcel      ! cellulose fraction for CWD
      real(r8), allocatable :: bgc_initial_Cstocks(:)  ! Initial Carbon stocks for a cold-start
      real(r8) :: bgc_initial_Cstocks_depth  ! Soil depth for initial Carbon stocks for a cold-start
@@ -131,6 +134,11 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%cwd_fcel = tempr
+
+    tString='somic_rf_cwdl2'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%rf_cwdl2 = tempr
 
     tString='somic_rf_cwdl3'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -252,9 +260,9 @@ contains
     ! !LOCAL VARIABLES
     integer  :: c, j                         ! indices
     real(r8) :: t                            ! temporary variable
-    real(r8) :: cn_dom                       ! C/N ratio of dissolved OM
-    real(r8) :: cn_mic                       ! C/N ratio of microbial biomass
-    real(r8) :: cn_mac                       ! C/N ratio of mineral-associated OM
+    real(r8) :: cn_s1                        ! C/N ratio of dissolved OM
+    real(r8) :: cn_s2                        ! C/N ratio of microbial biomass
+    real(r8) :: cn_s3                        ! C/N ratio of mineral-associated OM
     real(r8) :: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
     real(r8) :: clayfact                     ! rate modyfying coefficient due to soil clay content
     real(r8) :: ksorb_altered                ! rate constant for sorption, once rate modyfying sclars have been applied
@@ -288,8 +296,8 @@ contains
          )
 
       ! allocate(rf_s1s2(begc:endc, 1:nlevdecomp))
-      allocate( f_s1s2(begc:endc, 1:nlevdecomp))
-      allocate( f_s1s3(begc:endc, 1:nlevdecomp))
+      ! allocate( f_s1s2(begc:endc, 1:nlevdecomp))
+      ! allocate( f_s1s3(begc:endc, 1:nlevdecomp))
 
       !------- time-constant coefficients ---------- !
       ! set soil organic matter compartment C:N ratios
@@ -303,14 +311,14 @@ contains
       ! rf_l3s1 = 0.0_r8
       ! rf_s2s1 = 0.0_r8
       ! rf_s3s1 = 0.0_r8
-      rf_cwdl3 = params_inst%rf_cwdl3_bgc
+      rf_cwdl3 = params_inst%rf_cwdl3
 
       ! set the cellulose and lignin fractions for coarse woody debris
-      cwd_fcel = params_inst%cwd_fcel_bgc
+      cwd_fcel = params_inst%cwd_fcel
 
       ! set path fractions
-      f_s2s1 = 1.0_r8
-      f_s3s1 = 1.0_r8
+      ! f_s2s1 = 1.0_r8
+      ! f_s3s1 = 1.0_r8
       ! Note that some of the rf and f coefficents vary with time, hence not set here.  These include:
       !   rf_s1s2, f_s1s2, f_s1s3
 
@@ -513,6 +521,7 @@ contains
 
   !----- Use the CENTURY T response function
   real(r8) function ft_somic(t1)
+    use shr_const_mod , only : SHR_CONST_PI
     real(r8), intent(in) :: t1
     ft_somic = 11.75_r8 + (29.7_r8 / SHR_CONST_PI) * atan(SHR_CONST_PI * 0.031_r8  * (t1 - 15.4_r8))
   end function ft_somic
@@ -549,6 +558,8 @@ contains
     type(temperature_type)               , intent(in)    :: temperature_inst
     type(ch4_type)                       , intent(in)    :: ch4_inst
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
+    type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+
     !
     ! !LOCAL VARIABLES:
     integer :: c, fc, j, k, l                                ! indices
@@ -556,12 +567,15 @@ contains
     real(r8), parameter :: ref_clay = 23._r8                 ! named constant for reference clay content for normalization of sorption rates
     real(r8) :: frw(bounds%begc:bounds%endc)                 ! rooting fraction weight
     real(r8), allocatable:: fr(:,:)                          ! column-level rooting fraction by soil depth
+    real(r8) :: m_scalar(bounds%begc:bounds%endc, 1:nlevdecomp) ! Michaelis-Menten rate scalar
     real(r8) :: psi                                          ! temporary soilpsi for water scalar
     real(r8) :: k_l1s1                                       ! base rate constant for decomposition of l1
     real(r8) :: k_l2s1                                       ! base rate constant for decomposition of l2
     real(r8) :: k_l3s1                                       ! base rate constant for decomposition of l3
     real(r8) :: k_sorb                                       ! temporary sorption rate constant
     real(r8) :: k_mic_up                                     ! temporary microbial uptake rate constant
+    real(r8) :: k_s1s2                                       ! base rate constant for microbial uptake
+    real(r8) :: k_s1s3                                       ! base rate constant for sorption of doc
     real(r8) :: k_s2s1                                       ! base rate constant for loss of microbial biomass (including both death and exudates)
     real(r8) :: k_s3s1                                       ! base rate constant for desorption of mineral-associated OM
     real(r8) :: clay_scalar                                  ! scalar to modify sorption rate depending on clay content
@@ -569,6 +583,10 @@ contains
     real(r8) :: f_mic_up                                     ! temporary microbial uptake partition fraction
     real(r8) :: f_resp                                       ! temporary respiration fraction
     real(r8) :: k_frag                                       ! fragmentation rate constant CWD (1/sec)
+    real(r8) :: f_sorb                                       ! fraction of doc turnver sorbed to minerals
+    real(r8) :: f_mic_up                                     ! fraction of doc turnver taken up by microbes
+    real(r8) :: f_growth                                     ! fraction of microbial uptake allocated to growth
+    real(r8) :: f_resp                                       ! fraction of microbial uptake allocated to respiration
     real(r8) :: Q10                                          ! temperature dependence
     real(r8) :: froz_q10                                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
     real(r8) :: decomp_depth_efolding                        ! (meters) e-folding depth for reduction in decomposition [
@@ -586,26 +604,27 @@ contains
 
     !-----------------------------------------------------------------------
 
-    associate(                                                           &
-         cwd_flig       => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
-         rf_cwdl2       => CNParamsShareInst%rf_cwdl2                  , & ! Input:  [real(r8)         ]  respiration fraction in CWD to litter2 transition (frac)
-         minpsi         => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
-         maxpsi         => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
-         soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
-         t_soisno       => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
-         o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
-         finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
-         rf             => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col       , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
-         pathfrac       => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
-         t_scalar       => soilbiogeochem_carbonflux_inst%t_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp
-         w_scalar       => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
-         o_scalar       => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
-         decomp_k       => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
-         spinup_factor  => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
+    associate(                                                             &
+         cwd_flig         => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
+         rf_cwdl2         => CNParamsShareInst%rf_cwdl2                  , & ! Input:  [real(r8)         ]  respiration fraction in CWD to litter2 transition (frac)
+         minpsi           => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
+         maxpsi           => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
+         soilpsi          => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
+         t_soisno         => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
+         o2stress_sat     => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
+         o2stress_unsat   => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
+         finundated       => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
+         rf               => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col       , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
+         pathfrac         => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
+         t_scalar         => soilbiogeochem_carbonflux_inst%t_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp
+         w_scalar         => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
+         o_scalar         => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
+         decomp_k         => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
+         spinup_factor    => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
          decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
-         begc           => bounds%begc                                 , &
-         endc           => bounds%endc                                   &
+         clay             => soilstate_inst%cellclay_col                 , & ! Input:  [real(r8)          (:,:)   ]  column 3D clay (%)
+         begc             => bounds%begc                                 , &
+         endc             => bounds%endc                                   &
          )
 
       mino2lim = CNParamsShareInst%mino2lim
@@ -888,7 +907,7 @@ contains
                             (params_inst%mic_km   + decomp_cpools_vr(c, j, i_mic_som))
 
             ! partitioning of doc between competing processes of sorption and microbial uptake
-            clay_scalar = 1.0_r8 + params_inst%mclay * (clay - ref_clay)
+            clay_scalar = 1.0_r8 + params_inst%mclay * (clay(c, j) - ref_clay)
             k_sorb   = params_inst%k_s1s3 * clay_scalar    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified sorption rate
             k_mic_up = params_inst%k_s1s2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified microbial uptake rate
             f_sorb   = k_sorb / (k_sorb + k_mic_up)                                                              ! fraction of doc turnover sorbed
@@ -912,21 +931,21 @@ contains
             ! TO DO: since these never change, we should really just set them once during initialisation
             pathfrac(c, j, i_l1s1) = 1.0_r8
             pathfrac(c, j, i_l2s1) = 1.0_r8
-            pathfrac(c, j, i_l3s2) = 1.0_r8
+            ! pathfrac(c, j, i_l3s2) = 1.0_r8
             pathfrac(c, j, i_s1s2) = f_growth
             pathfrac(c, j, i_s1s3) = f_sorb
             pathfrac(c, j, i_s2s1) = 1.0_r8
-            pathfrac(c, j, i_s2s3) = 1.0_r8
+            ! pathfrac(c, j, i_s2s3) = 1.0_r8
             pathfrac(c, j, i_s3s1) = 1.0_r8
 
             ! Here we set respiration fractions. Note that only microbes respire
             rf(c, j, i_l1s1) = 0.0_r8
             rf(c, j, i_l2s1) = 0.0_r8
-            rf(c, j, i_l3s2) = 0.0_r8
+            ! rf(c, j, i_l3s2) = 0.0_r8
             rf(c, j, i_s1s2) = f_resp
             rf(c, j, i_s1s3) = 0.0_r8
             rf(c, j, i_s2s1) = 0.0_r8
-            rf(c, j, i_s2s3) = 0.0_r8
+            ! rf(c, j, i_s2s3) = 0.0_r8
             rf(c, j, i_s3s1) = 0.0_r8
          end do
       end do
