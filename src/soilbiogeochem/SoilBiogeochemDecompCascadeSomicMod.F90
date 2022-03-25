@@ -615,7 +615,7 @@ contains
       endif
 
       Q10 = CNParamsShareInst%Q10                                             ! set "Q10" parameter
-      froz_q10  = CNParamsShareInst%froz_q10                                  ! set "froz_q10" parameter
+      froz_q10  = CNParamsShareInst%froz_q10                                  ! set "froz_q10" parameter
       decomp_depth_efolding = CNParamsShareInst%decomp_depth_efolding         ! Set "decomp_depth_efolding" parameter
 
       ! base rate constants for transitions (must be in per-second, otherwise we should insert a conversion here)
