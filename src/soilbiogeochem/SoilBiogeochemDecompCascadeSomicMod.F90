@@ -239,8 +239,7 @@ contains
 
 
   !-----------------------------------------------------------------------
-  subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst, &
-                                      soilstate_inst, soilbiogeochem_carbonstate_inst)
+  subroutine init_decompcascade_somic(bounds, soilbiogeochem_state_inst) ! , soilstate_inst) !, soilbiogeochem_carbonstate_inst) ! TODO parameters were deleted, uncomment them once sure
     !
     ! !DESCRIPTION:
     !  Initialize rate constants and decomposition pathways following the decomposition cascade of the SOMic model.
@@ -252,8 +251,8 @@ contains
     ! !ARGUMENTS:
     type(bounds_type)                    , intent(in)    :: bounds
     type(soilbiogeochem_state_type)      , intent(inout) :: soilbiogeochem_state_inst
-    type(soilstate_type)                 , intent(in)    :: soilstate_inst
-    type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+    ! type(soilstate_type)                 , intent(in)    :: soilstate_inst
+    ! type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
 
     !
     ! !LOCAL VARIABLES
@@ -274,7 +273,7 @@ contains
 
     associate(                                                                                     &
          ! Inputs
-         clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:, :)   ]  column 3D clay
+         ! clay                           => soilstate_inst%cellclay_col                           , & ! Input:  [real(r8)          (:, :)   ]  column 3D clay
          ! Outputs
          donor_pool                     => decomp_cascade_con%cascade_donor_pool                 , & ! Output: [integer           (:)     ]  which pool is C taken from for a given decomposition step
          receiver_pool                  => decomp_cascade_con%cascade_receiver_pool              , & ! Output: [integer           (:)     ]  which pool is C added to for a given decomposition step
@@ -289,7 +288,7 @@ contains
          is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose
          is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin
          spinup_factor                  => decomp_cascade_con%spinup_factor                      , & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool
-         decomp_cpools_vr               => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col  , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+         ! decomp_cpools_vr               => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col  , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
          begc                           => bounds%begc                                           , &
          endc                           => bounds%endc                                             &
          )

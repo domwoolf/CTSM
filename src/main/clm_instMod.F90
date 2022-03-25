@@ -387,7 +387,7 @@ contains
        else if (decomp_method == mimics_decomp ) then
           call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, soilstate_inst)
        else if (decomp_method == somic_decomp ) then
-          call init_decompcascade_somic(bounds, soilbiogeochem_state_inst, soilstate_inst)
+          call init_decompcascade_somic(bounds, soilbiogeochem_state_inst)
        end if
 
        ! Initalize soilbiogeochem carbon types
