@@ -2,7 +2,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
   !-----------------------------------------------------------------------
   ! !DESCRIPTION:
   ! Sets the coefficients used in the decomposition submodel.
-  ! This uses the SOMic parameters
+  ! This uses the SOMic model
   !
   ! !USES:
   use shr_kind_mod                       , only : r8 => shr_kind_r8
