@@ -11,8 +11,8 @@ module EDBGCDynMod
   use shr_log_mod                     , only : errMsg => shr_log_errMsg
   use abortutils                      , only : endrun
   use SoilBiogeochemDecompCascadeConType , only : somic_decomp, mimics_decomp, century_decomp, decomp_method
-  use CNVegCarbonStateType	      , only : cnveg_carbonstate_type
-  use CNVegCarbonFluxType	      , only : cnveg_carbonflux_type
+  use CNVegCarbonStateType	          , only : cnveg_carbonstate_type
+  use CNVegCarbonFluxType	          , only : cnveg_carbonflux_type
   use SoilBiogeochemStateType         , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType   , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
@@ -22,7 +22,7 @@ module EDBGCDynMod
   use SoilStateType                   , only : soilstate_type
   use SoilHydrologyType               , only : soilhydrology_type
   use TemperatureType                 , only : temperature_type
-  use WaterFluxBulkType                   , only : waterfluxbulk_type
+  use WaterFluxBulkType               , only : waterfluxbulk_type
   use ActiveLayerMod                  , only : active_layer_type
   use atm2lndType                     , only : atm2lnd_type
   use SoilStateType                   , only : soilstate_type
@@ -186,7 +186,7 @@ contains
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
     else if (decomp_method == somic_decomp) then
-       call decomp_rates_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
+       call decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
             ch4_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst)
     end if
 
