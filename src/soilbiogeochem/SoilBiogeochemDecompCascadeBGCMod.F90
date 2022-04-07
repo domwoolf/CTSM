@@ -552,7 +552,7 @@ contains
     real(r8):: froz_q10                     ! separate q10 for frozen soil respiration rates.  default to same as above zero rates
     real(r8):: decomp_depth_efolding        ! (meters) e-folding depth for reduction in decomposition [
     integer :: c, fc, j, k, l
-    real(r8):: catanf                       ! hyperbolic temperature function from CENTURY
+    ! real(r8):: catanf                       ! hyperbolic temperature function from CENTURY
     real(r8):: catanf_30                    ! reference rate at 30C
     real(r8):: t1                           ! temperature argument
     real(r8):: normalization_factor         ! factor by which to offset the decomposition rates frm century to a q10 formulation
