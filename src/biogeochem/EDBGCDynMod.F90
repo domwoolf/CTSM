@@ -1,7 +1,7 @@
 module EDBGCDynMod
 
-! This module creates a pathway to call the belowground biogeochemistry code as driven by the fates vegetation model
-! but bypassing the aboveground CN vegetation code.  It is modeled after the CNDriverMod in its call sequence and
+! This module creates a pathway to call the belowground biogeochemistry code as driven by the fates vegetation model 
+! but bypassing the aboveground CN vegetation code.  It is modeled after the CNDriverMod in its call sequence and 
 ! functionality.
 
   use shr_kind_mod                    , only : r8 => shr_kind_r8
@@ -10,9 +10,9 @@ module EDBGCDynMod
   use perf_mod                        , only : t_startf, t_stopf
   use shr_log_mod                     , only : errMsg => shr_log_errMsg
   use abortutils                      , only : endrun
-  use SoilBiogeochemDecompCascadeConType , only : somic_decomp, mimics_decomp, century_decomp, decomp_method
-  use CNVegCarbonStateType	          , only : cnveg_carbonstate_type
-  use CNVegCarbonFluxType	          , only : cnveg_carbonflux_type
+  use SoilBiogeochemDecompCascadeConType , only : no_soil_decomp, somic_decomp, mimics_decomp, century_decomp, decomp_method
+  use CNVegCarbonStateType	      , only : cnveg_carbonstate_type
+  use CNVegCarbonFluxType	      , only : cnveg_carbonflux_type
   use SoilBiogeochemStateType         , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType   , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
@@ -22,12 +22,14 @@ module EDBGCDynMod
   use SoilStateType                   , only : soilstate_type
   use SoilHydrologyType               , only : soilhydrology_type
   use TemperatureType                 , only : temperature_type
-  use WaterFluxBulkType               , only : waterfluxbulk_type
+  use WaterFluxBulkType                   , only : waterfluxbulk_type
   use ActiveLayerMod                  , only : active_layer_type
   use atm2lndType                     , only : atm2lnd_type
   use SoilStateType                   , only : soilstate_type
   use ch4Mod                          , only : ch4_type
+  use CLMFatesInterfaceMod            , only : hlm_fates_interface_type
 
+  implicit none
 
   ! public :: EDBGCDynInit         ! BGC dynamics: initialization
   public :: EDBGCDyn             ! BGC Dynamics
@@ -44,7 +46,7 @@ contains
        num_soilc, filter_soilc, num_soilp, filter_soilp, num_pcropp, filter_pcropp, doalb, &
        cnveg_carbonflux_inst, cnveg_carbonstate_inst,                                      &
        soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst,                    &
-       soilbiogeochem_state_inst,                                                          &
+       soilbiogeochem_state_inst, clm_fates,                                               &
        soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst,                &
        c13_soilbiogeochem_carbonstate_inst, c13_soilbiogeochem_carbonflux_inst,            &
        c14_soilbiogeochem_carbonstate_inst, c14_soilbiogeochem_carbonflux_inst,            &
@@ -82,7 +84,7 @@ contains
     use SoilBiogeochemNStateUpdate1Mod       , only: SoilBiogeochemNStateUpdate1
     !
     ! !ARGUMENTS:
-    type(bounds_type)                       , intent(in)    :: bounds
+    type(bounds_type)                       , intent(in)    :: bounds  
     integer                                 , intent(in)    :: num_soilc         ! number of soil columns in filter
     integer                                 , intent(in)    :: filter_soilc(:)   ! filter for soil columns
     integer                                 , intent(in)    :: num_soilp         ! number of soil patches in filter
@@ -109,6 +111,7 @@ contains
     type(temperature_type)                  , intent(inout) :: temperature_inst
     type(crop_type)                         , intent(in)    :: crop_inst
     type(ch4_type)                          , intent(in)    :: ch4_inst
+    type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
     !
     ! !LOCAL VARIABLES:
     real(r8):: cn_decomp_pools(bounds%begc:bounds%endc,1:nlevdecomp,1:ndecomp_pools)
@@ -124,36 +127,39 @@ contains
     begc = bounds%begc; endc = bounds%endc
 
     associate(                                                                    &
-         laisun                    => canopystate_inst%laisun_patch             , & ! Input:  [real(r8) (:)   ]  sunlit projected leaf area index
-         laisha                    => canopystate_inst%laisha_patch             , & ! Input:  [real(r8) (:)   ]  shaded projected leaf area index
+         laisun                    => canopystate_inst%laisun_patch             , & ! Input:  [real(r8) (:)   ]  sunlit projected leaf area index        
+         laisha                    => canopystate_inst%laisha_patch             , & ! Input:  [real(r8) (:)   ]  shaded projected leaf area index        
          frac_veg_nosno            => canopystate_inst%frac_veg_nosno_patch     , & ! Input:  [integer  (:)   ]  fraction of vegetation not covered by snow (0 OR 1) [-]
-         frac_veg_nosno_alb        => canopystate_inst%frac_veg_nosno_alb_patch , & ! Output: [integer  (:) ] frac of vegetation not covered by snow [-]
-         tlai                      => canopystate_inst%tlai_patch               , & ! Input:  [real(r8) (:) ]  one-sided leaf area index, no burying by snow
-         tsai                      => canopystate_inst%tsai_patch               , & ! Input:  [real(r8) (:)   ]  one-sided stem area index, no burying by snow
-         elai                      => canopystate_inst%elai_patch               , & ! Output: [real(r8) (:) ] one-sided leaf area index with burying by snow
-         esai                      => canopystate_inst%esai_patch               , & ! Output: [real(r8) (:) ] one-sided stem area index with burying by snow
-         htop                      => canopystate_inst%htop_patch               , & ! Output: [real(r8) (:) ] canopy top (m)
-         hbot                      => canopystate_inst%hbot_patch                 & ! Output: [real(r8) (:) ] canopy bottom (m)
+         frac_veg_nosno_alb        => canopystate_inst%frac_veg_nosno_alb_patch , & ! Output: [integer  (:) ] frac of vegetation not covered by snow [-]         
+         tlai                      => canopystate_inst%tlai_patch               , & ! Input:  [real(r8) (:) ]  one-sided leaf area index, no burying by snow     
+         tsai                      => canopystate_inst%tsai_patch               , & ! Input:  [real(r8) (:)   ]  one-sided stem area index, no burying by snow     
+         elai                      => canopystate_inst%elai_patch               , & ! Output: [real(r8) (:) ] one-sided leaf area index with burying by snow    
+         esai                      => canopystate_inst%esai_patch               , & ! Output: [real(r8) (:) ] one-sided stem area index with burying by snow    
+         htop                      => canopystate_inst%htop_patch               , & ! Output: [real(r8) (:) ] canopy top (m)                                     
+         hbot                      => canopystate_inst%hbot_patch                 & ! Output: [real(r8) (:) ] canopy bottom (m)                                  
       )
 
     ! --------------------------------------------------
     ! zero the column-level C and N fluxes
     ! --------------------------------------------------
+    
+    if ( decomp_method /= no_soil_decomp )then
+       call t_startf('SoilBGCZero')
 
-    call t_startf('BGCZero')
-
-    call soilbiogeochem_carbonflux_inst%SetValues( &
-         num_soilc, filter_soilc, 0._r8)
-    if ( use_c13 ) then
-       call c13_soilbiogeochem_carbonflux_inst%SetValues( &
+       call soilbiogeochem_carbonflux_inst%SetValues( &
             num_soilc, filter_soilc, 0._r8)
-    end if
-    if ( use_c14 ) then
-       call c14_soilbiogeochem_carbonflux_inst%SetValues( &
-            num_soilc, filter_soilc, 0._r8)
+       if ( use_c13 ) then
+          call c13_soilbiogeochem_carbonflux_inst%SetValues( &
+               num_soilc, filter_soilc, 0._r8)
+       end if
+       if ( use_c14 ) then
+          call c14_soilbiogeochem_carbonflux_inst%SetValues( &
+               num_soilc, filter_soilc, 0._r8)
+       end if
+
+       call t_stopf('SoilBGCZero')
     end if
 
-    call t_stopf('BGCZero')
 
     ! --------------------------------------------------
     ! Nitrogen Deposition, Fixation and Respiration
@@ -185,25 +191,23 @@ contains
        call decomp_rates_mimics(bounds, num_soilc, filter_soilc, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
-    else if (decomp_method == somic_decomp) then
-       call decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
-            ch4_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst)
     end if
 
-    ! calculate potential decomp rates and total immobilization demand (previously inlined in CNDecompAlloc)
-    call SoilBiogeochemPotential (bounds, num_soilc, filter_soilc,                                                    &
-         soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst,                  &
-         soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst,                                         &
-         cn_decomp_pools=cn_decomp_pools(begc:endc,1:nlevdecomp,1:ndecomp_pools), &
-         p_decomp_cpool_loss=p_decomp_cpool_loss(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
-         p_decomp_cn_gain=p_decomp_cn_gain(begc:endc,1:nlevdecomp,1:ndecomp_pools), &
-         pmnf_decomp_cascade=pmnf_decomp_cascade(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
-         p_decomp_npool_to_din=p_decomp_npool_to_din(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions))
-
+    if ( decomp_method /= no_soil_decomp )then
+       ! calculate potential decomp rates and total immobilization demand (previously inlined in CNDecompAlloc)
+       call SoilBiogeochemPotential (bounds, num_soilc, filter_soilc,                                                    &
+            soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst,                  &
+            soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst,                                         &
+            cn_decomp_pools=cn_decomp_pools(begc:endc,1:nlevdecomp,1:ndecomp_pools), & 
+            p_decomp_cpool_loss=p_decomp_cpool_loss(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
+            p_decomp_cn_gain=p_decomp_cn_gain(begc:endc,1:nlevdecomp,1:ndecomp_pools), &
+            pmnf_decomp_cascade=pmnf_decomp_cascade(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
+            p_decomp_npool_to_din=p_decomp_npool_to_din(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions))
+    end if
 
     !--------------------------------------------
-    ! Resolve the competition between plants and soil heterotrophs
-    ! for available soil mineral N resource
+    ! Resolve the competition between plants and soil heterotrophs 
+    ! for available soil mineral N resource 
     !--------------------------------------------
     ! will add this back in when integrtating hte nutirent cycles
 
@@ -215,15 +219,16 @@ contains
     ! Calculation of actual immobilization and decomp rates, following
     ! resolution of plant/heterotroph  competition for mineral N (previously inlined in CNDecompAllocation in CNDecompMod)
 
-    call t_startf('SoilBiogeochemDecomp')
+    if ( decomp_method /= no_soil_decomp )then
+       call t_startf('SoilBiogeochemDecomp')
 
-    call SoilBiogeochemDecomp (bounds, num_soilc, filter_soilc,                                                       &
-         soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst,                  &
-         soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst,                                         &
-         cn_decomp_pools=cn_decomp_pools(begc:endc,1:nlevdecomp,1:ndecomp_pools),                       &
-         p_decomp_cpool_loss=p_decomp_cpool_loss(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
-         pmnf_decomp_cascade=pmnf_decomp_cascade(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
-         p_decomp_npool_to_din=p_decomp_npool_to_din(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions))
+       call SoilBiogeochemDecomp (bounds, num_soilc, filter_soilc,                                                       &
+            soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst,                  &
+            soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst,                                         &
+            cn_decomp_pools=cn_decomp_pools(begc:endc,1:nlevdecomp,1:ndecomp_pools),                       & 
+            p_decomp_cpool_loss=p_decomp_cpool_loss(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
+            pmnf_decomp_cascade=pmnf_decomp_cascade(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions), &
+            p_decomp_npool_to_din=p_decomp_npool_to_din(begc:endc,1:nlevdecomp,1:ndecomp_cascade_transitions))
 
     call t_stopf('SoilBiogeochemDecomp')
 
@@ -257,6 +262,25 @@ contains
 
     call t_stopf('SoilBiogeochemLittVertTransp')
 
+    ! Wood product fluxes will eventually be added to FATES-CLM. However
+    ! it is likely this will be implemented during or after we break away from
+    ! using this module. This module and the current coupling stategy bypasses
+    ! a number of processes in CLM, which includes the wood product modules.
+    ! Therefore the following call is a placeholder so that the wood-product 
+    ! wrapper code can be copied from here and applied at the right place when the time comes.
+    ! RGK 06-2022
+    
+    !call FatesWrapWoodProducts(bounds, num_soilc, filter_soilc,c_products_inst)
+    !call t_startf('CNWoodProducts')
+    !call c_products_inst%UpdateProducts(bounds, &
+    !     num_soilp, filter_soilp, &
+    !     dwt_wood_product_gain_patch = cnveg_carbonflux_inst%dwt_wood_productc_gain_patch(begp:endp), &
+    !     wood_harvest_patch = cnveg_carbonflux_inst%wood_harvestc_patch(begp:endp), &
+    !     dwt_crop_product_gain_patch = cnveg_carbonflux_inst%dwt_crop_productc_gain_patch(begp:endp), &
+    !     crop_harvest_to_cropprod_patch = cnveg_carbonflux_inst%crop_harvestc_to_cropprodc_patch(begp:endp))
+    !call t_stopf('CNWoodProducts')
+
+    
     end associate
 
   end subroutine EDBGCDyn
@@ -268,7 +292,7 @@ contains
        c13_soilbiogeochem_carbonflux_inst, c13_soilbiogeochem_carbonstate_inst, &
        c14_soilbiogeochem_carbonflux_inst, c14_soilbiogeochem_carbonstate_inst, &
        soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst, &
-       clm_fates, nc)
+       nc)
     !
     ! !DESCRIPTION:
     ! Call to all CN and SoilBiogeochem summary routines
@@ -278,10 +302,10 @@ contains
     use clm_varpar                        , only: ndecomp_cascade_transitions
     use CNPrecisionControlMod             , only: CNPrecisionControl
     use SoilBiogeochemPrecisionControlMod , only: SoilBiogeochemPrecisionControl
-    use CLMFatesInterfaceMod              , only: hlm_fates_interface_type
+    
     !
     ! !ARGUMENTS:
-    type(bounds_type)                       , intent(in)    :: bounds
+    type(bounds_type)                       , intent(in)    :: bounds  
     integer                                 , intent(in)    :: num_soilc         ! number of soil columns in filter
     integer                                 , intent(in)    :: filter_soilc(:)   ! filter for soil columns
     integer                                 , intent(in)    :: num_soilp         ! number of soil patches in filter
@@ -294,26 +318,25 @@ contains
     type(soilbiogeochem_carbonstate_type)   , intent(inout) :: c14_soilbiogeochem_carbonstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
-    type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
     integer                                 , intent(in)    :: nc  ! thread index
     !
     ! !LOCAL VARIABLES:
     integer :: begc,endc
     !-----------------------------------------------------------------------
-
+  
     begc = bounds%begc; endc= bounds%endc
 
     ! Call to all summary routines
 
     call t_startf('BGCsum')
 
-    ! Set controls on very low values in critical state variables
+    ! Set controls on very low values in critical state variables 
 
     call SoilBiogeochemPrecisionControl(num_soilc, filter_soilc,  &
          soilbiogeochem_carbonstate_inst, c13_soilbiogeochem_carbonstate_inst, &
          c14_soilbiogeochem_carbonstate_inst,soilbiogeochem_nitrogenstate_inst)
 
-    ! Note - all summary updates to cnveg_carbonstate_inst and cnveg_carbonflux_inst are done in
+    ! Note - all summary updates to cnveg_carbonstate_inst and cnveg_carbonflux_inst are done in 
     ! soilbiogeochem_carbonstate_inst%summary and CNVeg_carbonstate_inst%summary
 
     ! ----------------------------------------------
