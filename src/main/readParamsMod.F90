@@ -24,7 +24,7 @@ module readParamsMod
 contains
 
   !-----------------------------------------------------------------------
-  subroutine readParameters (nutrient_competition_method, photosyns_inst)
+  subroutine readParameters (photosyns_inst)
     !
     ! ! USES:
     use CNSharedParamsMod                 , only : CNParamsReadShared
@@ -66,7 +66,6 @@ contains
     !
     ! !ARGUMENTS:
     type(photosyns_type)                   , intent(in) :: photosyns_inst
-    class(nutrient_competition_method_type), intent(in) :: nutrient_competition_method
     !
     ! !LOCAL VARIABLES:
     character(len=256) :: locfn ! local file name
