@@ -138,6 +138,9 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 7
              ndecomp_cascade_transitions = 14
+          else if (decomp_method == somic_decomp) then
+             ndecomp_pools = 6
+             ndecomp_cascade_transitions = 7
           end if
        else
           if (decomp_method == century_decomp) then
@@ -146,6 +149,9 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 8
              ndecomp_cascade_transitions = 15
+          else if (decomp_method == somic_decomp) then
+             ndecomp_pools = 7
+             ndecomp_cascade_transitions = 9
           end if
        endif
        ! The next param also appears as a dimension in the params files dated

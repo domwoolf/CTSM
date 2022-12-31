@@ -39,7 +39,7 @@ contains
     use SoilBiogeochemLittVertTranspMod   , only : readSoilBiogeochemLittVertTranspParams => readParams
     use SoilBiogeochemPotentialMod        , only : readSoilBiogeochemPotentialParams      => readParams
     use SoilBiogeochemDecompMod           , only : readSoilBiogeochemDecompParams         => readParams
-    use SoilBiogeochemDecompCascadeSomicMod  , only : readSoilBiogeochemDecompSomicParams    => readParams
+    use SoilBiogeochemDecompCascadeSomicMod, only : readSoilBiogeochemDecompSomicParams   => readParams
     use SoilBiogeochemDecompCascadeMIMICSMod, only : readSoilBiogeochemDecompMimicsParams => readParams
     use SoilBiogeochemDecompCascadeBGCMod , only : readSoilBiogeochemDecompBgcParams      => readParams
     use ch4Mod                            , only : readCH4Params                          => readParams

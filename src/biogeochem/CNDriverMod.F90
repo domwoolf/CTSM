@@ -12,7 +12,7 @@ module CNDriverMod
   use perf_mod                        , only : t_startf, t_stopf
   use clm_varctl                      , only : use_nitrif_denitrif, use_nguardrail
   use clm_varctl                      , only : iulog, use_crop, use_crop_agsys
-  use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, century_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType, only : somic_decomp, mimics_decomp, century_decomp, decomp_method
   use CNSharedParamsMod               , only : use_fun
   use CNVegStateType                  , only : cnveg_state_type
   use CNVegCarbonStateType            , only : cnveg_carbonstate_type
@@ -136,6 +136,7 @@ contains
     use CNSharedParamsMod                 , only: use_fun
     use dynHarvestMod                     , only: CNHarvest
     use SoilBiogeochemDecompCascadeMIMICSMod, only: decomp_rates_mimics
+    use SoilBiogeochemDecompCascadeSomicMod , only: decomp_rate_constants_somic
     use SoilBiogeochemDecompCascadeBGCMod , only: decomp_rate_constants_bgc
     use SoilBiogeochemCompetitionMod      , only: SoilBiogeochemCompetition
     use SoilBiogeochemDecompMod           , only: SoilBiogeochemDecomp
@@ -345,6 +346,9 @@ contains
             num_soilp, filter_soilp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
+    else if (decomp_method == somic_decomp) then
+       call decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
+            ch4_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst)
     end if
     call t_stopf('DecompRate')
 

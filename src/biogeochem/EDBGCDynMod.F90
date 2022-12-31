@@ -105,7 +105,7 @@ contains
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
     type(active_layer_type)                 , intent(in)    :: active_layer_inst
     type(atm2lnd_type)                      , intent(in)    :: atm2lnd_inst
-    type(waterfluxbulk_type)                    , intent(in)    :: waterfluxbulk_inst
+    type(waterfluxbulk_type)                , intent(in)    :: waterfluxbulk_inst
     type(canopystate_type)                  , intent(in)    :: canopystate_inst
     type(soilstate_type)                    , intent(in)    :: soilstate_inst
     type(temperature_type)                  , intent(inout) :: temperature_inst
@@ -189,6 +189,9 @@ contains
             num_soilp, filter_soilp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
+    else if (decomp_method == somic_decomp) then
+       call decomp_rate_constants_somic(bounds, num_soilc, filter_soilc, soilstate_inst, temperature_inst, &
+            ch4_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst)
     end if
 
     if ( decomp_method /= no_soil_decomp )then

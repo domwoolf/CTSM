@@ -383,11 +383,11 @@ contains
 
        call init_decomp_cascade_constants( )
        if (decomp_method == century_decomp ) then
-          call init_decompcascade_bgc(bounds, soilbiogeochem_state_inst, &
-                                      soilstate_inst )
+          call init_decompcascade_bgc(bounds, soilbiogeochem_state_inst, soilstate_inst )
        else if (decomp_method == mimics_decomp ) then
-          call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
-                                         soilstate_inst)
+          call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, soilstate_inst)
+       else if (decomp_method == somic_decomp ) then
+          call init_decompcascade_somic(bounds, soilbiogeochem_state_inst)
        end if
 
        ! Initalize soilbiogeochem carbon types

@@ -16,7 +16,7 @@ module SoilBiogeochemDecompCascadeSOMicMod
   use spmdMod                            , only : masterproc
   use abortutils                         , only : endrun
   use CNSharedParamsMod                  , only : CNParamsShareInst, nlev_soildecomp_standard
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, InitSoilTransfer, use_soil_matrixcn
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
@@ -601,24 +601,24 @@ contains
     !-----------------------------------------------------------------------
 
     associate(                                                             &
-         cwd_flig         => CNParamsShareInst%cwd_flig                  , & ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
-         rf_cwdl2         => CNParamsShareInst%rf_cwdl2                  , & ! Input:  [real(r8)         ]  respiration fraction in CWD to litter2 transition (frac)
-         minpsi           => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
-         maxpsi           => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
-         soilpsi          => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
-         t_soisno         => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         o2stress_sat     => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
-         o2stress_unsat   => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
-         finundated       => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area
+         cwd_flig         => CNParamsShareInst%cwd_flig                  , &                ! Input:  [real(r8)         ]  lignin fraction of coarse woody debris (frac)
+         rf_cwdl2         => CNParamsShareInst%rf_cwdl2                  , &                ! Input:  [real(r8)         ]  respiration fraction in CWD to litter2 transition (frac)
+         minpsi           => CNParamsShareInst%minpsi                    , &                ! Input:  [real(r8)         ]  minimum soil suction (mm)
+         maxpsi           => CNParamsShareInst%maxpsi                    , &                ! Input:  [real(r8)         ]  maximum soil suction (mm)
+         soilpsi          => soilstate_inst%soilpsi_col                  , &                ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)
+         t_soisno         => temperature_inst%t_soisno_col               , &                ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
+         o2stress_sat     => ch4_inst%o2stress_sat_col                   , &                ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
+         o2stress_unsat   => ch4_inst%o2stress_unsat_col                 , &                ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
+         finundated       => ch4_inst%finundated_col                     , &                ! Input:  [real(r8) (:)     ]  fractional inundated area
          rf               => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col       , & ! Output: [real(r8) (:,:,:) ]  respired fraction in decomposition step (frac)
          pathfrac         => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col , & ! Output: [real(r8) (:,:,:) ]  what fraction of C passes from donor to receiver pool through a given transition (frac)
-         t_scalar         => soilbiogeochem_carbonflux_inst%t_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp
-         w_scalar         => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
-         o_scalar         => soilbiogeochem_carbonflux_inst%o_scalar_col , & ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
-         decomp_k         => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
-         spinup_factor    => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool
-         decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
-         clay             => soilstate_inst%cellclay_col                 , & ! Input:  [real(r8)          (:,:)   ]  column 3D clay (%)
+         t_scalar         => soilbiogeochem_carbonflux_inst%t_scalar_col , &                ! Output: [real(r8) (:,:)   ]  soil temperature scalar for decomp
+         w_scalar         => soilbiogeochem_carbonflux_inst%w_scalar_col , &                ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp
+         o_scalar         => soilbiogeochem_carbonflux_inst%o_scalar_col , &                ! Output: [real(r8) (:,:)   ]  fraction by which decomposition is limited by anoxia
+         decomp_k         => soilbiogeochem_carbonflux_inst%decomp_k_col , &                ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
+         spinup_factor    => decomp_cascade_con%spinup_factor            , &                ! Input:  [real(r8) (:)     ]  factor for AD spinup associated with each pool
+         decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &       ! Input:  [real(r8) (:,:,:) ]  (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+         clay             => soilstate_inst%cellclay_col                 , &                ! Input:  [real(r8) (:,:)   ]  column 3D clay (%)
          begc             => bounds%begc                                 , &
          endc             => bounds%endc                                   &
          )
