@@ -95,7 +95,7 @@ module CLMFatesInterfaceMod
    use decompMod         , only : get_proc_bounds,   &
                                   get_proc_clumps,   &
                                   get_clump_bounds
-   use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, decomp_method
+   use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, somic_decomp, decomp_method
    use SoilBiogeochemDecompCascadeConType , only : no_soil_decomp, century_decomp
    use GridCellType      , only : grc
    use ColumnType        , only : col
@@ -357,9 +357,6 @@ module CLMFatesInterfaceMod
      call t_startf('fates_globals2')
 
      if (use_fates) then
-
-        
-
         ! Send parameters individually
         call set_fates_ctrlparms('num_sw_bbands',ival=numrad)
         call set_fates_ctrlparms('vis_sw_index',ival=ivis)
@@ -383,6 +380,9 @@ module CLMFatesInterfaceMod
            call set_fates_ctrlparms('decomp_method',cval='CENTURY')
         elseif(decomp_method == no_soil_decomp ) then
            call set_fates_ctrlparms('decomp_method',cval='NONE')
+        elseif(decomp_method == somic_decomp ) then
+           write(iulog,*) 'If using SOMic biogeochemitstry, then do not use FATES'
+           call endrun(msg=errMsg(sourcefile, __LINE__))
         end if
 
         if(use_fates_tree_damage)then
