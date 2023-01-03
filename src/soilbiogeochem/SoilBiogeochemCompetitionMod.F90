@@ -610,7 +610,7 @@ contains
 
                end if
           
-               if (decomp_method == mimics_decomp) then
+               if (decomp_method == mimics_decomp) then !TODO:SOMIC maybe we need to also do this in somic method???
                   ! turn off fpi for MIMICS and only lets plants
                   ! take up available mineral nitrogen.
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems
@@ -710,7 +710,7 @@ contains
 
                end if
                
-               if (decomp_method == mimics_decomp) then
+               if (decomp_method == mimics_decomp) then !TODO:SOMIC maybe we need to also do this in somic method???
                   ! turn off fpi for MIMICS and only lets plants
                   ! take up available mineral nitrogen.
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems

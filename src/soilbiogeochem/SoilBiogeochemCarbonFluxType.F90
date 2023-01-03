@@ -395,7 +395,7 @@ contains
         end do
 
         if ( nlevdecomp_full > 1 ) then  
-           if (decomp_method == century_decomp) then
+           if (decomp_method == century_decomp) then !TODO:SOMIC maybe we need to also do this in somic method???
               data2dptr => this%t_scalar_col(begc:endc,1:nlevsoi)
               call hist_addfld_decomp (fname='T_SCALAR', units='unitless',  type2d='levsoi', &
                 avgflag='A', long_name='temperature inhibition of decomposition', &
