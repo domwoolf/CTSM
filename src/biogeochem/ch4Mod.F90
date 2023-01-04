@@ -77,8 +77,7 @@ module ch4Mod
      real(r8) :: pHmax                ! maximum pH for methane production(= 9._r8)
      real(r8) :: pHmin                ! minimum pH for methane production(= 2.2_r8)
      real(r8) :: oxinhib              ! inhibition of methane production by oxygen (m^3/mol)
-
-     ! ch4 oxidation constants
+                                      ! ch4 oxidation constants
      real(r8) :: vmax_ch4_oxid        ! oxidation rate constant (= 45.e-6_r8 * 1000._r8 / 3600._r8) [mol/m3-w/s];
      real(r8) :: k_m                  ! Michaelis-Menten oxidation rate constant for CH4 concentration 
      real(r8) :: q10_ch4oxid          ! Q10 oxidation constant
@@ -86,20 +85,16 @@ module ch4Mod
      real(r8) :: k_m_o2               ! Michaelis-Menten oxidation rate constant for O2 concentration
      real(r8) :: k_m_unsat            ! Michaelis-Menten oxidation rate constant for CH4 concentration
      real(r8) :: vmax_oxid_unsat      ! (= 45.e-6_r8 * 1000._r8 / 3600._r8 / 10._r8) [mol/m3-w/s]
-
-     ! ch4 aerenchyma constants
+                                      ! ch4 aerenchyma constants
      real(r8) :: aereoxid             ! fraction of methane flux entering aerenchyma rhizosphere that will be
-
-     ! oxidized rather than emitted
+                                      ! oxidized rather than emitted
      real(r8) :: scale_factor_aere    ! scale factor on the aerenchyma area for sensitivity tests
      real(r8) :: nongrassporosratio   ! Ratio of root porosity in non-grass to grass, used for aerenchyma transport
      real(r8) :: unsat_aere_ratio     ! Ratio to multiply upland vegetation aerenchyma porosity by compared to inundated systems (= 0.05_r8 / 0.3_r8)
      real(r8) :: porosmin             ! minimum aerenchyma porosity (unitless)(= 0.05_r8) 
-
-     ! ch4 ebbulition constants
+                                      ! ch4 ebbulition constants
      real(r8) :: vgc_max              ! ratio of saturation pressure triggering ebullition
-
-     ! ch4 transport constants
+                                      ! ch4 transport constants
      real(r8) :: satpow               ! exponent on watsat for saturated soil solute diffusion
      real(r8) :: scale_factor_gasdiff ! For sensitivity tests; convection would allow this to be > 1
      real(r8) :: scale_factor_liqdiff ! For sensitivity tests; convection would allow this to be > 1
@@ -154,7 +149,6 @@ module ch4Mod
      real(r8), pointer, private :: ch4_surf_diff_unsat_col    (:)   ! col CH4 surface flux (mol/m2/s)
      real(r8), pointer, private :: ch4_surf_diff_lake_col     (:)   ! col CH4 surface flux (mol/m2/s)
      real(r8), pointer, private :: ch4_dfsat_flux_col         (:)   ! col CH4 flux to atm due to decreasing fsat (kg C/m^2/s) [+]
-
      real(r8), pointer, private :: zwt_ch4_unsat_col          (:)   ! col depth of water table for unsaturated fraction (m)
      real(r8), pointer, private :: lake_soilc_col             (:,:) ! col total soil organic matter found in level (g C / m^3) (nlevsoi)
      real(r8), pointer, private :: totcolch4_col              (:)   ! col total methane found in soil col (g C / m^2)

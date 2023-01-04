@@ -234,6 +234,21 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
+    write(iulog,*) 'Reading SOMIC params:'
+    write(iulog,*) 'SOMIC params (somic_cwd_fcel, somic_rf_cwdl2, somic_rf_cwdl3)', &
+                    params_inst%cwd_fcel, params_inst%rf_cwdl2, params_inst%rf_cwdl3
+    write(iulog,*) 'SOMIC params (somic_cn_dom, somic_cn_mic, somic_cn_mac)', &
+                    params_inst%cn_dom, params_inst%cn_mic, params_inst%cn_mac
+    write(iulog,*) 'SOMIC params (somic_cue_0, somic_mcue, somic_mic_vmax, somic_mic_km)' &
+                    params_inst%cue_0, params_inst%mcue, params_inst%mic_vmax, params_inst%mic_km
+    write(iulog,*) 'SOMIC params (somic_k_l1s1, somic_k_l2s1, somic_k_l3s1', &
+                    params_inst%k_l1s1, params_inst%k_l2s1, params_inst%k_l3s1,
+    write(iulog,*) 'SOMIC params (somic_k_s1s2, somic_k_s1s3, somic_k_s2s1, somic_k_s3s1', &
+                    params_inst%k_s1s2, params_inst%k_s1s3, params_inst%k_s2s1, params_inst%k_s3s1
+    write(iulog,*) 'SOMIC params (somic_mclay, somic_clay0, somic_initial_Cstocks_depth)', &
+                    params_inst%mclay, params_inst%clay0, params_inst%bgc_initial_Cstocks_depth
+    write(iulog,*) 'SOMIC params (somic_initial_Cstocks)', params_inst%bgc_initial_Cstocks(:)
+
   end subroutine readParams
 
 
@@ -894,6 +909,7 @@ contains
       endif
 
       ! calculate rate constants and path/respiration fractions all litter and som pools and their transitions
+      write(iulog,*) 'SOMIC: calculate rate constants and path/respiration fractions...'
       do j = 1, nlevdecomp
          do fc = 1, num_soilc
             c = filter_soilc(fc)
@@ -943,6 +959,13 @@ contains
             rf(c, j, i_s2s1) = 0.0_r8
             ! rf(c, j, i_s2s3) = 0.0_r8
             rf(c, j, i_s3s1) = 0.0_r8
+
+           write(iulog,*) 'c, j, m_scalar, clay_scalar, t_scalar, w_scalar, o_scalar', &
+                           c, j, m_scalar(c, j), clay_scalar(c, j), t_scalar(c, j), w_scalar(c, j), o_scalar(c, j)
+           write(iulog,*) 'c, j, f_sorb, f_mic_up, f_growth, f_resp', &
+                           c, j, f_sorb, f_mic_up, f_growth, f_resp
+           write(iulog,*) 'c, j, decomp_k', decomp_k(c, j, :)
+
          end do
       end do
 
