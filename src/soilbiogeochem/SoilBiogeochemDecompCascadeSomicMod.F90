@@ -239,7 +239,7 @@ contains
                     params_inst%cwd_fcel, params_inst%rf_cwdl2, params_inst%rf_cwdl3
     write(iulog,*) 'SOMIC params (somic_cn_dom, somic_cn_mic, somic_cn_mac)', &
                     params_inst%cn_dom, params_inst%cn_mic, params_inst%cn_mac
-    write(iulog,*) 'SOMIC params (somic_cue_0, somic_mcue, somic_mic_vmax, somic_mic_km)' &
+    write(iulog,*) 'SOMIC params (somic_cue_0, somic_mcue, somic_mic_vmax, somic_mic_km)', &
                     params_inst%cue_0, params_inst%mcue, params_inst%mic_vmax, params_inst%mic_km
     write(iulog,*) 'SOMIC params (somic_k_l1s1, somic_k_l2s1, somic_k_l3s1', &
                     params_inst%k_l1s1, params_inst%k_l2s1, params_inst%k_l3s1,
