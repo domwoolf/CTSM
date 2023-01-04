@@ -961,7 +961,7 @@ contains
             rf(c, j, i_s3s1) = 0.0_r8
 
            write(iulog,*) 'c, j, m_scalar, clay_scalar, t_scalar, w_scalar, o_scalar', &
-                           c, j, m_scalar(c, j), clay_scalar(c, j), t_scalar(c, j), w_scalar(c, j), o_scalar(c, j)
+                           c, j, m_scalar(c, j), clay_scalar, t_scalar(c, j), w_scalar(c, j), o_scalar(c, j)
            write(iulog,*) 'c, j, f_sorb, f_mic_up, f_growth, f_resp', &
                            c, j, f_sorb, f_mic_up, f_growth, f_resp
            write(iulog,*) 'c, j, decomp_k', decomp_k(c, j, :)
