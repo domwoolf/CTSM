@@ -917,11 +917,23 @@ contains
             ! calculate the rate constant scalar for Michaelis-Menten dynamics to relate microbial biomass to rate
             m_scalar(c, j) = params_inst%mic_vmax * decomp_cpools_vr(c, j, i_mic_som) / &
                             (params_inst%mic_km   + decomp_cpools_vr(c, j, i_mic_som))
+            ! ensure that m scalar does not fall below minimum threshold, in case of soil columns starting without any microbial biomass
+            if (m_scalar(c, j) < eps) then
+               m_scalar(c, j) = eps
+            end if
 
             ! partitioning of doc between competing processes of sorption and microbial uptake
             clay_scalar = 1.0_r8 + params_inst%mclay * (clay(c, j) - ref_clay)
             k_sorb   = params_inst%k_s1s3 * clay_scalar    * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified sorption rate
+            ! ensure that k_sorb does not fall below minimum threshold, in case any scalars are zero
+            if (k_sorb < eps) then
+               k_sorb = eps
+            end if
             k_mic_up = params_inst%k_s1s2 * m_scalar(c, j) * t_scalar(c, j) * w_scalar(c, j) * o_scalar(c, j)    ! modified microbial uptake rate
+            ! ensure that k_mic_up does not fall below minimum threshold, in case any scalars are zero
+            if (k_mic_up < eps) then
+               k_mic_up = eps
+            end if
             f_sorb   = k_sorb / (k_sorb + k_mic_up)                                                              ! fraction of doc turnover sorbed
             f_mic_up = 1.0_r8 - f_sorb                                                                           ! fraction of doc turnover taken up by microbes
             f_growth = f_mic_up * cue(t_soisno(c, j))                                                            ! fraction of doc turnover to anabolic growth
@@ -969,7 +981,6 @@ contains
                            f_sorb, f_mic_up, f_growth, f_resp
            write(iulog,*) 'decomp_k', decomp_k(c, j, :)
            write(iulog,*) '-------------'
-
          end do
       end do
 
