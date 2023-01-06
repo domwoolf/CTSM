@@ -4177,6 +4177,11 @@ contains
             write(iulog,*)'cellorg=', cellorg(c, :)
             write(iulog,*)'bsw=', bsw(c, :)
             write(iulog,*)'watsat=', watsat(c, :)
+            write(iulog,*)'conc_ch4=', conc_ch4(c, :)
+            write(iulog,*)'conc_ch4_bef=', conc_ch4_bef(c, :)
+            write(iulog,*)'dz=', dz(c, :)
+            write(iulog,*)'ch4_prod_depth=', ch4_prod_depth(c, :)
+            write(iulog,*)'ch4_oxid_depth=', ch4_oxid_depth(c, :)
             call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, &
                  msg=' ERROR: CH4 Conservation Error in CH4Mod during diffusion'//&
                  errMsg(sourcefile, __LINE__))
