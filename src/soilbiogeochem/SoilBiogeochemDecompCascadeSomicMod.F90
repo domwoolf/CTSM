@@ -555,8 +555,8 @@ contains
     if (cue < cue_min) then
        cue = cue_min
     end if
-    if (cue > 0.cue_max) then
-       cue = 0.cue_max
+    if (cue > cue_max) then
+       cue = cue_max
     end if
   end function cue
 
