@@ -549,6 +549,12 @@ contains
     ! http://onlinelibrary.wiley.com/doi/10.1111/ele.12113/full
     ! http://link.springer.com/article/10.1007/s10533-013-9948-8
     cue = params_inst%cue_0 - (t1 - ref_temp) * params_inst%mcue
+    if (cue < eps) then
+       cue = eps
+    end if
+    if (cue > 0.7_r8) then ! TODO convert hard constant to parameter (max_cue)
+       cue = 0.7_r8
+    end if
   end function cue
 
   !-----------------------------------------------------------------------
@@ -936,7 +942,7 @@ contains
             end if
             f_sorb   = k_sorb / (k_sorb + k_mic_up)                                                              ! fraction of doc turnover sorbed
             f_mic_up = 1.0_r8 - f_sorb                                                                           ! fraction of doc turnover taken up by microbes
-            f_growth = f_mic_up * cue(t_soisno(c, j))                                                            ! fraction of doc turnover to anabolic growth
+            f_growth = f_mic_up * cue(t_soisno(c, j) - SHR_CONST_TKFRZ)                                          ! fraction of doc turnover to anabolic growth
             f_resp   = f_mic_up - f_growth                                                                       ! fraction of doc turnover that is respired to CO2
 
             ! rate constants for decomposition of pools
