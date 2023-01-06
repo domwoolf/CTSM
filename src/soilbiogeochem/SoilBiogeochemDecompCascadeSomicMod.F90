@@ -544,16 +544,19 @@ contains
   real(r8) function cue (t1)
     real(r8), intent(in) :: t1
     real(r8), parameter :: ref_temp = 25._r8   ! named constant for reference temperature for normalization of cue
+    real(r8), parameter :: cue_min = 1.e-6_r8  ! named constant for minimum CUE
+    real(r8), parameter :: cue_max = 0.7_r8    ! named constant for maximum CUE
+
     ! Temperature dependence of microbial carbon use efficiency derived from the following sources:
     ! http://onlinelibrary.wiley.com.proxy.library.cornell.edu/doi/10.1890/15-2110.1/full
     ! http://onlinelibrary.wiley.com/doi/10.1111/ele.12113/full
     ! http://link.springer.com/article/10.1007/s10533-013-9948-8
     cue = params_inst%cue_0 - (t1 - ref_temp) * params_inst%mcue
-    if (cue < eps) then
-       cue = eps
+    if (cue < cue_min) then
+       cue = cue_min
     end if
-    if (cue > 0.7_r8) then ! TODO convert hard constant to parameter (max_cue)
-       cue = 0.7_r8
+    if (cue > 0.cue_max) then
+       cue = 0.cue_max
     end if
   end function cue
 
