@@ -4174,6 +4174,9 @@ contains
                  nstep,c,errch4(c)
             g = col%gridcell(c)
             write(iulog,*)'Latdeg,Londeg=',grc%latdeg(g),grc%londeg(g)
+            write(iulog,*)'cellorg=', cellorg(:)
+            write(iulog,*)'bsw=', bsw(:)
+            write(iulog,*)'watsat=', watsat(:)
             call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, &
                  msg=' ERROR: CH4 Conservation Error in CH4Mod during diffusion'//&
                  errMsg(sourcefile, __LINE__))
