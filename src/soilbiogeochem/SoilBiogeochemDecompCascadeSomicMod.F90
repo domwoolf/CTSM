@@ -648,6 +648,7 @@ contains
          )
 
       mino2lim = CNParamsShareInst%mino2lim
+      days_per_year = get_average_days_per_year()
 
       if ( use_century_tfunc .and. normalize_q10_to_century_tfunc ) then
          call endrun(msg='ERROR: cannot have both use_century_tfunc and normalize_q10_to_century_tfunc set as true'//&
