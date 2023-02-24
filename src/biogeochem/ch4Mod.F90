@@ -4171,17 +4171,19 @@ contains
             ch4_surf_diff(c) = ch4_surf_diff(c) - errch4(c)/dtime
          else ! errch4 > 1e-8 mol / m^2 / timestep
             write(iulog,*)'CH4 Conservation Error in CH4Mod during diffusion, nstep, c, errch4 (mol /m^2.timestep)', &
-                 nstep,c,errch4(c)
+                 nstep, c, errch4(c)
             g = col%gridcell(c)
-            write(iulog,*)'Latdeg,Londeg=',grc%latdeg(g),grc%londeg(g)
-            write(iulog,*)'cellorg=', cellorg(c, :)
-            write(iulog,*)'bsw=', bsw(c, :)
-            write(iulog,*)'watsat=', watsat(c, :)
-            write(iulog,*)'conc_ch4=', conc_ch4(c, :)
-            write(iulog,*)'conc_ch4_bef=', conc_ch4_bef(c, :)
-            write(iulog,*)'dz=', dz(c, :)
-            write(iulog,*)'ch4_prod_depth=', ch4_prod_depth(c, :)
-            write(iulog,*)'ch4_oxid_depth=', ch4_oxid_depth(c, :)
+            write(iulog,*)'Latdeg,Londeg =', grc%latdeg(g), grc%londeg(g)
+            write(iulog,*)'cellorg =', cellorg(c, :)
+            write(iulog,*)'bsw =', bsw(c, :)
+            write(iulog,*)'watsat =', watsat(c, :)
+            write(iulog,*)'conc_ch4 =', conc_ch4(c, :)
+            write(iulog,*)'conc_ch4_bef =', conc_ch4_bef(c, :)
+            write(iulog,*)'conc_ch4_rel =', conc_ch4_rel(c, :)
+            write(iulog,*)'epsilon_t =', epsilon_t(c, :, 1)
+            write(iulog,*)'dz =', dz(c, :)
+            write(iulog,*)'ch4_prod_depth =', ch4_prod_depth(c, :)
+            write(iulog,*)'ch4_oxid_depth =', ch4_oxid_depth(c, :)
             call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, &
                  msg=' ERROR: CH4 Conservation Error in CH4Mod during diffusion'//&
                  errMsg(sourcefile, __LINE__))

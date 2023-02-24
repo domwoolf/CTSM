@@ -666,7 +666,10 @@ contains
       k_s1s3 = params_inst%k_s1s3
       k_s2s1 = params_inst%k_s2s1
       k_s3s1 = params_inst%k_s3s1
-      k_frag = 1._r8  / (secspday * days_per_year * CNParamsShareInst%tau_cwd)
+      k_frag = 1._r8  / (secspday * days_per_year * CNParamsShareInst%tau_cwd) !TODO CHECK FOR DIVISION BY ZERO
+      if ((secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8) then
+          write(iulog,*) 'warning: (secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8'
+      endif
 
      ! calculate reference temperature rate scalar
       ft_somic_30 = ft_somic(30._r8)
