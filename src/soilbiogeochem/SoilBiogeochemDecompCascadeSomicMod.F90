@@ -234,20 +234,20 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%bgc_initial_Cstocks_depth = tempr
 
-    write(iulog,*) 'Reading SOMIC params:'
-    write(iulog,*) 'SOMIC params (somic_cwd_fcel, somic_rf_cwdl2, somic_rf_cwdl3)', &
-                    params_inst%cwd_fcel, params_inst%rf_cwdl2, params_inst%rf_cwdl3
-    write(iulog,*) 'SOMIC params (somic_cn_dom, somic_cn_mic, somic_cn_mac)', &
-                    params_inst%cn_dom, params_inst%cn_mic, params_inst%cn_mac
-    write(iulog,*) 'SOMIC params (somic_cue_0, somic_mcue, somic_mic_vmax, somic_mic_km)', &
-                    params_inst%cue_0, params_inst%mcue, params_inst%mic_vmax, params_inst%mic_km
-    write(iulog,*) 'SOMIC params (somic_k_l1s1, somic_k_l2s1, somic_k_l3s1', &
-                    params_inst%k_l1s1, params_inst%k_l2s1, params_inst%k_l3s1
-    write(iulog,*) 'SOMIC params (somic_k_s1s2, somic_k_s1s3, somic_k_s2s1, somic_k_s3s1', &
-                    params_inst%k_s1s2, params_inst%k_s1s3, params_inst%k_s2s1, params_inst%k_s3s1
-    write(iulog,*) 'SOMIC params (somic_mclay, somic_clay0, somic_initial_Cstocks_depth)', &
-                    params_inst%mclay, params_inst%clay0, params_inst%bgc_initial_Cstocks_depth
-    write(iulog,*) 'SOMIC params (somic_initial_Cstocks)', params_inst%bgc_initial_Cstocks(:)
+    !write(iulog,*) 'Reading SOMIC params:'
+    !write(iulog,*) 'SOMIC params (somic_cwd_fcel, somic_rf_cwdl2, somic_rf_cwdl3)', &
+    !                params_inst%cwd_fcel, params_inst%rf_cwdl2, params_inst%rf_cwdl3
+    !write(iulog,*) 'SOMIC params (somic_cn_dom, somic_cn_mic, somic_cn_mac)', &
+    !                params_inst%cn_dom, params_inst%cn_mic, params_inst%cn_mac
+    !write(iulog,*) 'SOMIC params (somic_cue_0, somic_mcue, somic_mic_vmax, somic_mic_km)', &
+    !                params_inst%cue_0, params_inst%mcue, params_inst%mic_vmax, params_inst%mic_km
+    !write(iulog,*) 'SOMIC params (somic_k_l1s1, somic_k_l2s1, somic_k_l3s1', &
+    !                params_inst%k_l1s1, params_inst%k_l2s1, params_inst%k_l3s1
+    !write(iulog,*) 'SOMIC params (somic_k_s1s2, somic_k_s1s3, somic_k_s2s1, somic_k_s3s1', &
+    !                params_inst%k_s1s2, params_inst%k_s1s3, params_inst%k_s2s1, params_inst%k_s3s1
+    !write(iulog,*) 'SOMIC params (somic_mclay, somic_clay0, somic_initial_Cstocks_depth)', &
+    !                params_inst%mclay, params_inst%clay0, params_inst%bgc_initial_Cstocks_depth
+    !write(iulog,*) 'SOMIC params (somic_initial_Cstocks)', params_inst%bgc_initial_Cstocks(:)
 
   end subroutine readParams
 
@@ -668,9 +668,9 @@ contains
       k_s2s1 = params_inst%k_s2s1
       k_s3s1 = params_inst%k_s3s1
       k_frag = 1._r8  / (secspday * days_per_year * CNParamsShareInst%tau_cwd) !TODO CHECK FOR DIVISION BY ZERO
-      if ((secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8) then
-          write(iulog,*) 'warning: (secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8'
-      endif
+      !if ((secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8) then
+      !    write(iulog,*) 'warning: (secspday * days_per_year * CNParamsShareInst%tau_cwd) .eq. 0._r8'
+      !endif
 
      ! calculate reference temperature rate scalar
       ft_somic_30 = ft_somic(30._r8)
